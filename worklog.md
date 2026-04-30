@@ -2,6 +2,66 @@
 
 ---
 
+Task ID: 4+5+6+8
+Agent: Features Developer
+Task: 通知中心 + Board拖拽Toast + Agent对话 + 执行历史
+
+Work Log:
+- 创建 /src/app/api/notifications/route.ts - GET 端点，查询审计日志作为通知，支持 unreadIds 参数（客户端追踪已读状态），返回通知列表+未读数，6种图标类型（create/change/assign/delete/analyze/execute），中文描述自动生成
+- 创建 /src/hooks/use-notifications.ts - 通知 hook：
+  - localStorage 持久化已读 ID 集合（最近500条）
+  - markNotificationRead / markAllNotificationsRead / getUnreadIds 工具函数
+  - useNotifications hook 使用 TanStack Query，30秒自动刷新，客户端过滤已读状态
+  - Notification / NotificationsResponse 类型定义
+- 创建 /src/components/notification-panel.tsx - 通知面板组件：
+  - Popover 弹出式通知中心，Bell 图标按钮 + 红色未读数 Badge
+  - 通知列表：6种彩色图标（create=绿/change=琥珀/assign=青/delete=红/analyze=紫/execute=橙），未读项有左边框+背景高亮+蓝点指示器
+  - "全部已读"按钮一键标记
+  - 空态：Bell 图标+"暂无通知"
+  - framer-motion 入场动画，ScrollArea 限制高度
+- 在 /src/components/app-shell.tsx 中已有 NotificationPanel 导入（确认集成正常）
+- Board 拖拽非法状态 Toast：
+  - 在 /src/components/views/board-view.tsx handleDragEnd 中添加无效转换检测
+  - 无效拖拽时 toast.error 提示：「无法将任务从「进行中」移动到「待处理」，请遵循状态流转规则」
+  - 添加 shakingCardId 状态，触发卡片 shake + flash-red 动画（0.5s抖动+红色闪烁+ring边框）
+  - IssueCard 增加 isShaking prop，KanbanColumn 传递 shakingCardId
+  - 在 /src/app/globals.css 添加 @keyframes shake 和 @keyframes flash-red 动画，以及 .animate-shake / .animate-flash-red 工具类
+- 创建 /src/app/api/chat/route.ts - Agent 对话 API：
+  - POST 端点，接受 { issueId, message, agentId?, userId }
+  - 自动获取 Issue 上下文（标题、描述、状态、最近20条评论）
+  - 构建完整 Prompt（Agent名称、能力、系统提示词、任务信息、对话历史）
+  - 使用 z-ai-web-dev-sdk 生成 AI 回复
+  - 创建人类评论 + AI 回复评论（authorType: 'agent', metadata: { isChatResponse: true }）
+  - 审计日志 + broadcastEvent 实时推送
+  - AI 不可用时提供降级回复（fallback 模式）
+- Board Issue 详情 Sheet 增加 Agent 对话区：
+  - "🤖 问 Agent" 按钮，点击展开对话面板
+  - Agent 信息栏（头像+名称+描述）
+  - 聊天气泡风格显示最近6条评论（Agent=左侧主色气泡，人类=右侧青色气泡，系统=右侧琥珀色气泡）
+  - AI 思考中动画（三点跳动 + "思考中..." 文字）
+  - 专用对话输入框，Enter 发送
+  - 未指派 Agent 时提示"指派一个 Agent 后即可开始对话"
+  - framer-motion 展开/收起动画
+- Agents 视图 Agent 详情 Sheet 增加执行历史：
+  - "执行历史" 区块（History 图标）
+  - 时间线布局：左侧竖线连接圆形状态节点
+  - 每条记录：状态图标（完成=✓/进行=⚠/待处理=⏰）+ 状态颜色边框
+  - 任务标题 + 状态 Badge + 优先级色点 + 场景标签
+  - 时间信息：创建日期 → 完成日期
+  - 空态：History 图标 + "暂无执行历史"
+  - 新增 History/CheckCircle2/AlertCircle/Timer 图标导入
+- 修复 app-shell.tsx 已有 lint 错误（自闭合 span className 模板字符串结尾格式问题）
+
+Stage Summary:
+- 4个新功能全部完成
+- 通知中心：实时审计日志通知，客户端已读追踪，Popover 面板，6种图标分类
+- Board 拖拽Toast：非法状态转换中文提示 + 卡片 shake+flash-red 动画
+- Agent 对话：z-ai-web-dev-sdk AI 回复，聊天气泡 UI，思考中动画
+- 执行历史：Agent 详情页时间线布局，状态/优先级/场景标签，时间信息
+- 所有 ESLint 检查通过，应用正常编译运行
+
+---
+
 Task ID: 7+8+9
 Agent: Agent Views Developer
 Task: 构建 Agents、Monitor、Skills、Settings 视图，连接真实数据
@@ -977,3 +1037,158 @@ Stage Summary:
 3. 实现Agent执行历史完整列表（Dashboard的Agent活动feed）
 4. 移动端响应式进一步优化
 5. 灵感分析失败时明确提示"请先创建在线Agent"
+
+---
+
+Task ID: 2+3+7
+Agent: UI Polish & Styling Developer
+Task: 全面UI/UX样式打磨 - 10个模块细节优化
+
+Work Log:
+
+1. **globals.css 增强**：
+   - 新增 6 个 keyframes：fadeSlideIn、pulse-soft、bounce-subtle、arrow-flow、glow-pulse（用于在线Agent卡片发光）
+   - 新增 6 个 utility classes：animate-fade-slide-in、animate-pulse-soft、animate-bounce-subtle、animate-arrow-flow、animate-glow-pulse
+   - 新增 card-hover-gradient（hover时渐变覆盖效果）、interactive-transition（统一交互过渡）
+   - 滚动条宽度从6px→5px，圆角从3px→999px（更优雅）
+   - 暗色模式滚动条保持对比度
+
+2. **App Shell 打磨**：
+   - 侧栏导航：active项使用 bg-primary/10 + scale-[1.02]，inactive项使用 hover:bg-muted/50 + scale-[1.02]
+   - 侧栏Daemon状态：添加 emerald 发光阴影 shadow-[0_0_6px]
+   - Header搜索栏：h-8→h-9、rounded-md→rounded-lg、bg-muted/50→bg-background、添加 focus-within:ring-1 + focus-within:shadow-sm、placeholder更详细
+   - 通知铃铛：添加 animate-bounce-subtle 动画包裹
+   - 用户头像下拉菜单：添加 animate-fade-slide-in 入场动画
+   - Footer状态栏：添加 border-t border-border/30、Daemon状态点从1.5px→2px、添加 animate-pulse-soft + 发光阴影、文字颜色随状态变化（emerald-600/red-500 + font-medium）
+
+3. **Dashboard View 打磨**：
+   - 统计卡片渐变：从 `/10 via /5 to-transparent` 改为具体色系渐变（emerald-50、purple-50、green-50、teal-50），暗色模式使用 900/30
+   - 灵感管线箭头：ChevronRight→ArrowRight + animate-arrow-flow 流动动画
+   - 活动时间线：hover显示精确时间戳（hidden group-hover:inline）
+   - Agent列表：在线Agent行添加 animate-glow-pulse 发光效果
+
+4. **Board View 打磨**：
+   - Kanban列头：4列分别添加 from-slate-50、from-emerald-50、from-amber-50、from-green-50 渐变背景
+   - Issue卡片：默认 shadow-sm、hover→shadow-md、添加 card-hover-gradient
+   - 优先级Badge：添加 dot 字段，显示 size-1.5 圆点（红/橙/蓝/灰）
+   - DragOverlay：rotate 2→1.5deg、添加 scale-[1.02]
+   - 空列状态：Inbox图标 + "拖拽任务到此处"提示文字
+   - Table视图：行添加 even:bg-muted/20 交替色
+   - 排序指示器：active列 ArrowUpDown 变为 text-primary，inactive为 opacity-30
+
+5. **Agents View 打磨**：
+   - 新增 STATUS_CARD_GRADIENTS 常量：online/busy/offline 分别使用 emerald-50/amber-50/gray-50 渐变
+   - Agent卡片：在线Agent添加 animate-glow-pulse 发光脉冲
+   - Agent卡片背景：根据 agentStatus 使用 STATUS_CARD_GRADIENTS（不再是 groupGradient）
+   - 状态点：busy 添加 opacity 闪烁动画
+   - 能力标签：添加 CapIcon 图标显示
+   - 在线统计卡：状态点添加 animate-pulse-soft + emerald 发光阴影
+
+6. **Skills View 打磨**：
+   - 新增 SCENE_BORDER_COLORS 常量：5种场景分别用 emerald/violet/amber/rose/gray 左边框
+   - Skill卡片：添加 border-l-[3px] + card-hover-gradient + hover:-translate-y-0.5
+   - "内置" Badge：bg-primary/15 + font-semibold + border border-primary/20（更突出）
+   - 版本号：font-medium、使用次数：font-semibold tabular-nums
+
+7. **Monitor View 打磨**：
+   - 日志条目：hover 从 bg-white/5→bg-white/10，agent类型添加 bg-emerald-500/5 底色、human添加 bg-sky-500/5、system添加 bg-amber-500/5
+   - Daemon在线图标：添加 animate-pulse-soft 脉冲
+   - Issue分布条：背景从 bg-muted 改为 bg-gradient-to-r from-muted to-muted/50 渐变
+
+8. **Sessions View 打磨**：
+   - Session卡片：添加 border-l-[3px] 状态色（active=emerald、paused=amber、completed=gray）
+   - 空状态：Terminal图标添加 animate-bounce-subtle 浮动动画
+   - 聊天气泡：px-3 py-2→px-4 py-2.5（更宽松间距）
+
+9. **Inspirations View 打磨**：
+   - Inspiration卡片：添加 border-l-[3px] + statusConfig.border（amber/teal/emerald/gray）
+   - 状态过滤器：Select包裹在 transition-all duration-300 ease-in-out 容器中
+   - 空态灯泡：size-12→size-14、glow强度增加（4px→16px/32px）、浮动幅度增大（-4→-6）
+
+10. **Settings View 打磨**：
+    - Section间距：space-y-6→space-y-8
+    - 偏好记忆条目：hover添加 bg-muted/20 背景高亮、transition-all duration-200
+    - 通知开关：添加 scale-90 统一尺寸
+
+Stage Summary:
+- 10个模块全部完成样式打磨
+- 新增6个CSS keyframes和6个utility classes
+- 全局交互过渡统一（interactive-transition）
+- 卡片效果增强（card-hover-gradient、glow-pulse）
+- 状态指示器视觉升级（发光阴影、脉冲动画、彩色状态点）
+- 列表/表格可读性提升（交替行色、排序高亮、类型底色）
+- 空状态更友好（图标动画、提示文字）
+- 所有 ESLint 检查通过，应用正常编译运行
+
+---
+Task ID: bugfix-round3
+Agent: Main Developer
+Task: 修复关键 500 错误 Bug + 新增 3 个高级功能
+
+Work Log:
+- **关键 Bug 修复**：monitor-view.tsx 中 HealthScoreRing 函数被定义了两次（第67行和第847行），导致 Turbopack 编译错误 "the name `HealthScoreRing` is defined multiple times"
+  - 此 Bug 导致整个应用崩溃，所有 API 路由返回 500 错误
+  - 修复方案：合并两个定义为统一的 `value` prop 版本，删除文件底部重复定义
+- **子任务 API Bug 修复**：writeAuditLog 导入名称错误，应为 createAuditLog
+- **创建键盘快捷键系统** `/src/components/keyboard-shortcuts.tsx`：
+  - `useKeyboardShortcuts` hook：全局键盘监听
+  - Cmd/Ctrl+1-8：切换8个视图（Dashboard/Board/Inspirations/Agents/Monitor/Sessions/Skills/Settings）
+  - `?` 键：打开快捷键帮助对话框
+  - Cmd/Ctrl+I：表达想法
+  - `KeyboardShortcutsHelp` 对话框组件：分组显示（导航/操作），kbd 键位徽章
+  - 集成到 app-shell.tsx：Header 添加键盘图标按钮
+- **创建 Agent 统计 API** `/src/app/api/agents/[id]/stats/route.ts`：
+  - GET 端点，返回 Agent 性能数据
+  - statusBreakdown：open/inProgress/inReview/resolved 计数
+  - completionRate：完成率百分比
+  - avgResolutionHours：平均解决时间
+  - sceneDistribution：场景分布
+  - priorityDistribution：优先级分布
+  - activityByDay：30天活动热力图数据
+  - recentActivityCount：最近活动计数
+- **创建 Issue 子任务 API** `/src/app/api/issues/[id]/subtasks/route.ts`：
+  - GET：列出子任务（parentIssueId 匹配）
+  - POST：创建子任务（自动关联父 Issue，继承 scene/creator/assignee）
+  - 审计日志 + 实时推送
+
+Stage Summary:
+- 关键 500 Bug 已修复（重复 HealthScoreRing 定义）
+- 3个新功能完成：键盘快捷键系统、Agent统计API、Issue子任务API
+- 所有 ESLint 检查通过，应用正常运行
+
+---
+
+## 项目当前状态（2026-04-30 Round 3 更新）
+
+### 判断
+平台功能丰富度达到高级阶段，8个前端视图 + 22+ API路由 + 键盘快捷键系统。当前处于"功能完善、持续打磨"阶段。
+
+### 已完成
+1. ✅ 9个数据库模型 + 22+ API路由（含 agents/stats、issues/subtasks）
+2. ✅ 8个前端视图（Dashboard/Board/Inspirations/Agents/Monitor/Sessions/Skills/Settings）
+3. ✅ 灵感→Agent分析→Issue创建完整闭环
+4. ✅ 看板拖拽 + 状态机 + 优先级色条 + 执行任务 + Agent对话
+5. ✅ Cmd+K 命令面板 + Cmd+1-8 视图切换 + ? 快捷键帮助
+6. ✅ 通知中心（实时审计日志通知 + 已读追踪）
+7. ✅ Daemon服务（CLI探测+Agent执行+心跳）
+8. ✅ WebSocket实时推送（9种事件）
+9. ✅ 种子数据一键初始化
+10. ✅ 暗色/亮色主题 + 动画 + 微交互 + 6个自定义 keyframes
+11. ✅ 审计日志 + 15分钟定时审查
+12. ✅ Agent统计API（完成率/场景分布/活动热力图）
+13. ✅ Issue子任务API（创建/列表子任务）
+14. ✅ Board拖拽非法状态toast + shake动画
+15. ✅ Monitor健康度环形图 + 系统状态仪表板
+
+### 未解决/风险
+1. Agent统计API数据尚未在Agents视图UI中展示（需要前端集成）
+2. Issue子任务UI尚未在Board视图中展示（需要前端集成）
+3. 灵感分析在没有在线Agent时仍缺少明确反馈
+4. 移动端响应式需要进一步优化
+
+### 建议下一阶段优先事项
+1. Agent视图集成统计API数据（性能图表、完成率Badge）
+2. Board视图集成子任务UI（进度条、创建子任务按钮）
+3. Dashboard增加时间范围选择器功能（7天/30天/全部）
+4. Settings视图增加保存反馈和更好的视觉分组
+5. 暗色模式全面审查和优化

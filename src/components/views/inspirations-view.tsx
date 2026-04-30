@@ -72,11 +72,11 @@ function AnimatedLightbulb() {
     <motion.div
       animate={{
         filter: [
-          'drop-shadow(0 0 2px oklch(0.75 0.15 85 / 20%))',
-          'drop-shadow(0 0 12px oklch(0.75 0.15 85 / 50%)) drop-shadow(0 0 24px oklch(0.75 0.15 85 / 15%))',
-          'drop-shadow(0 0 2px oklch(0.75 0.15 85 / 20%))',
+          'drop-shadow(0 0 4px oklch(0.75 0.15 85 / 30%))',
+          'drop-shadow(0 0 16px oklch(0.75 0.15 85 / 60%)) drop-shadow(0 0 32px oklch(0.75 0.15 85 / 20%))',
+          'drop-shadow(0 0 4px oklch(0.75 0.15 85 / 30%))',
         ],
-        y: [0, -4, 0],
+        y: [0, -6, 0],
       }}
       transition={{
         duration: 3,
@@ -84,7 +84,7 @@ function AnimatedLightbulb() {
         ease: 'easeInOut',
       }}
     >
-      <Lightbulb className="size-12 text-amber-400" />
+      <Lightbulb className="size-14 text-amber-400" />
     </motion.div>
   )
 }
@@ -106,7 +106,7 @@ function InspirationCard({
 
   return (
     <motion.div variants={item}>
-      <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 group card-flowing-gradient overflow-hidden">
+      <Card className={`hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 group card-flowing-gradient overflow-hidden border-l-[3px] ${statusConfig.border}`}>
         <CardContent className="p-4 space-y-3 relative">
           {/* Header row */}
           <div className="flex items-start gap-3">
@@ -349,6 +349,7 @@ export function InspirationsView() {
       {/* Filter */}
       <motion.div variants={item} className="flex items-center gap-2">
         <Filter className="size-4 text-muted-foreground" />
+        <div className="transition-all duration-300 ease-in-out">
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="h-8 w-[140px] text-xs">
             <SelectValue />
@@ -361,6 +362,7 @@ export function InspirationsView() {
             <SelectItem value="dismissed">已忽略 ({stats.dismissed})</SelectItem>
           </SelectContent>
         </Select>
+        </div>
       </motion.div>
 
       {/* Timeline */}

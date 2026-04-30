@@ -103,6 +103,8 @@ import {
   useUpdateIssue,
   useCreateComment,
   useDeleteIssue,
+  useCreateSubtask,
+  useSubtasks,
 } from '@/lib/hooks'
 import { useCurrentUser } from '@/lib/use-current-user'
 import { useAppStore, type BoardViewMode } from '@/lib/store'
@@ -133,17 +135,17 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 }
 
 const COLUMN_CONFIG = [
-  { id: 'open', label: '待处理', color: 'bg-slate-400', accent: 'border-t-slate-400', icon: Inbox, bgPattern: 'bg-pattern-dots', wipLimit: 10 },
-  { id: 'in_progress', label: '进行中', color: 'bg-emerald-500', accent: 'border-t-emerald-500', icon: CircleDot, bgPattern: 'bg-pattern-grid', wipLimit: 5 },
-  { id: 'in_review', label: '待审查', color: 'bg-amber-500', accent: 'border-t-amber-500', icon: Eye, bgPattern: 'bg-pattern-dots', wipLimit: 5 },
-  { id: 'resolved', label: '已解决', color: 'bg-green-500', accent: 'border-t-green-500', icon: CircleCheck, bgPattern: 'bg-pattern-grid', wipLimit: 20 },
+  { id: 'open', label: '待处理', color: 'bg-slate-400', accent: 'border-t-slate-400', icon: Inbox, bgPattern: 'bg-pattern-dots', wipLimit: 10, headerGradient: 'from-slate-50 via-slate-100/50 to-transparent dark:from-slate-800/30 dark:via-slate-800/10' },
+  { id: 'in_progress', label: '进行中', color: 'bg-emerald-500', accent: 'border-t-emerald-500', icon: CircleDot, bgPattern: 'bg-pattern-grid', wipLimit: 5, headerGradient: 'from-emerald-50 via-emerald-100/50 to-transparent dark:from-emerald-900/20 dark:via-emerald-900/10' },
+  { id: 'in_review', label: '待审查', color: 'bg-amber-500', accent: 'border-t-amber-500', icon: Eye, bgPattern: 'bg-pattern-dots', wipLimit: 5, headerGradient: 'from-amber-50 via-amber-100/50 to-transparent dark:from-amber-900/20 dark:via-amber-900/10' },
+  { id: 'resolved', label: '已解决', color: 'bg-green-500', accent: 'border-t-green-500', icon: CircleCheck, bgPattern: 'bg-pattern-grid', wipLimit: 20, headerGradient: 'from-green-50 via-green-100/50 to-transparent dark:from-green-900/20 dark:via-green-900/10' },
 ]
 
-const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon?: React.ElementType }> = {
-  urgent: { label: '紧急', color: 'text-red-600', bg: 'bg-red-500/10 border-red-500/30', border: 'border-l-red-500' },
-  high: { label: '高', color: 'text-orange-600', bg: 'bg-orange-500/10 border-orange-500/30', border: 'border-l-orange-500' },
-  medium: { label: '中', color: 'text-teal-600', bg: 'bg-teal-500/10 border-teal-500/30', border: 'border-l-teal-500' },
-  low: { label: '低', color: 'text-gray-500', bg: 'bg-gray-500/10 border-gray-500/30', border: 'border-l-gray-400' },
+const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; dot: string; icon?: React.ElementType }> = {
+  urgent: { label: '紧急', color: 'text-red-600', bg: 'bg-red-500/10 border-red-500/30', border: 'border-l-red-500', dot: 'bg-red-500' },
+  high: { label: '高', color: 'text-orange-600', bg: 'bg-orange-500/10 border-orange-500/30', border: 'border-l-orange-500', dot: 'bg-orange-500' },
+  medium: { label: '中', color: 'text-teal-600', bg: 'bg-teal-500/10 border-teal-500/30', border: 'border-l-teal-500', dot: 'bg-teal-500' },
+  low: { label: '低', color: 'text-gray-500', bg: 'bg-gray-500/10 border-gray-500/30', border: 'border-l-gray-400', dot: 'bg-gray-400' },
 }
 
 const SCENE_LABELS: Record<string, string> = {
@@ -166,7 +168,7 @@ const SCENE_ICONS: Record<string, React.ElementType> = {
 // Issue Card Component
 // ==========================================
 
-function IssueCard({ issue, onClick, onQuickAction }: { issue: Issue; onClick: () => void; onQuickAction: (action: string) => void }) {
+function IssueCard({ issue, onClick, onQuickAction, isShaking }: { issue: Issue; onClick: () => void; onQuickAction: (action: string) => void; isShaking?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: issue.id,
     data: { status: issue.status },
@@ -182,11 +184,12 @@ function IssueCard({ issue, onClick, onQuickAction }: { issue: Issue; onClick: (
   const labels = parseJsonField<string[]>(issue.labels, [])
   const SceneIcon = (issue.scene && SCENE_ICONS[issue.scene]) || null
   const commentCount = issue._count?.comments || 0
+  const childIssueCount = issue._count?.childIssues || 0
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
       <Card
-        className={`cursor-pointer transition-all duration-200 border-t-2 border-l-[3px] ${priority.border} ${COLUMN_CONFIG.find(c => c.id === issue.status)?.accent || ''} ${isDragging ? 'shadow-lg ring-2 ring-primary/20' : 'hover:shadow-md hover:-translate-y-0.5'} group relative hover:border-l-primary/50`}
+        className={`cursor-pointer transition-all duration-200 border-t-2 border-l-[3px] ${priority.border} ${COLUMN_CONFIG.find(c => c.id === issue.status)?.accent || ''} ${isDragging ? 'shadow-lg ring-2 ring-primary/20' : 'shadow-sm hover:shadow-md hover:-translate-y-0.5'} ${isShaking ? 'animate-shake animate-flash-red ring-2 ring-red-500/30' : ''} group relative hover:border-l-primary/50 card-hover-gradient`}
         onClick={onClick}
       >
         <CardContent className="p-3 space-y-2">
@@ -201,7 +204,8 @@ function IssueCard({ issue, onClick, onQuickAction }: { issue: Issue; onClick: (
 
           {/* Badges row */}
           <div className="flex flex-wrap gap-1">
-            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${priority.bg} ${priority.color} border`}>
+            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${priority.bg} ${priority.color} border gap-1`}>
+              <span className={`size-1.5 rounded-full ${priority.dot}`} />
               {priority.label}
             </Badge>
             {issue.scene && (
@@ -236,6 +240,12 @@ function IssueCard({ issue, onClick, onQuickAction }: { issue: Issue; onClick: (
               </span>
             </div>
             <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+              {childIssueCount > 0 && (
+                <span className="flex items-center gap-0.5">
+                  <List className="size-3" />
+                  {childIssueCount}
+                </span>
+              )}
               {commentCount > 0 && (
                 <span className="flex items-center gap-0.5">
                   <MessageSquare className="size-3" />
@@ -292,18 +302,20 @@ function KanbanColumn({
   issues,
   onIssueClick,
   onQuickAction,
+  shakingCardId,
 }: {
   config: typeof COLUMN_CONFIG[number]
   issues: Issue[]
   onIssueClick: (issue: Issue) => void
   onQuickAction: (issue: Issue, action: string) => void
+  shakingCardId: string | null
 }) {
   const isOverWip = issues.length > config.wipLimit
   const ColumnIcon = config.icon
 
   return (
     <div className={`flex flex-col rounded-lg border border-border/50 bg-muted/20 min-w-[280px] md:min-w-0 overflow-hidden`}>
-      <div className={`flex items-center gap-2 p-3 border-b border-border/50 border-t-2 ${config.accent}`}>
+      <div className={`flex items-center gap-2 p-3 border-b border-border/50 border-t-2 ${config.accent} bg-gradient-to-r ${config.headerGradient}`}>
         <div className={`flex size-6 items-center justify-center rounded-md ${config.color.replace('bg-', 'bg-').replace('-400', '-500/10').replace('-500', '-500/10')}`}>
           <ColumnIcon className={`size-3.5 ${config.color.replace('bg-', 'text-')}`} />
         </div>
@@ -329,11 +341,14 @@ function KanbanColumn({
                 issue={issue}
                 onClick={() => onIssueClick(issue)}
                 onQuickAction={(action) => onQuickAction(issue, action)}
+                isShaking={shakingCardId === issue.id}
               />
             ))
           ) : (
-            <div className="flex items-center justify-center py-8 text-muted-foreground/50">
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/40">
+              <Inbox className="size-8 mb-2 opacity-30" />
               <p className="text-xs">暂无任务</p>
+              <p className="text-[10px] mt-0.5 opacity-60">拖拽任务到此处</p>
             </div>
           )}
         </div>
@@ -515,6 +530,9 @@ function IssueDetailSheet({
 }) {
   const [commentText, setCommentText] = useState('')
   const [executing, setExecuting] = useState(false)
+  const [chatMode, setChatMode] = useState(false)
+  const [chatMessage, setChatMessage] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
   const changeStatusMutation = useUpdateIssueStatus()
   const updateIssueMutation = useUpdateIssue()
   const createCommentMutation = useCreateComment()
@@ -581,6 +599,37 @@ function IssueDetailSheet({
       toast.error('执行请求失败，请检查 Daemon 是否在线')
     } finally {
       setExecuting(false)
+    }
+  }
+
+  const handleChatWithAgent = async () => {
+    if (!chatMessage.trim() || !userId || !issue) return
+    if (!issue.assigneeId) {
+      toast.error('请先指派一个 Agent 再对话')
+      return
+    }
+    setChatLoading(true)
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          issueId: issue.id,
+          message: chatMessage.trim(),
+          agentId: issue.assigneeId,
+          userId,
+        }),
+      })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error((errData as Record<string, string>).error || '对话请求失败')
+      }
+      setChatMessage('')
+      toast.success('Agent 已回复')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '对话请求失败')
+    } finally {
+      setChatLoading(false)
     }
   }
 
@@ -689,6 +738,140 @@ function IssueDetailSheet({
 
         <Separator className="mb-4" />
 
+        {/* Chat with Agent Section */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Bot className="size-4" />
+              Agent 对话
+            </h4>
+            {issue.assigneeId && (
+              <Button
+                variant={chatMode ? 'default' : 'outline'}
+                size="sm"
+                className="text-xs gap-1.5"
+                onClick={() => setChatMode(!chatMode)}
+              >
+                <Bot className="size-3" />
+                {chatMode ? '关闭对话' : '🤖 问 Agent'}
+              </Button>
+            )}
+          </div>
+
+          {chatMode && issue.assigneeId && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="space-y-3"
+            >
+              {/* Agent info */}
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10">
+                <Avatar className="size-6 ring-1 ring-primary/20">
+                  <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
+                    <Bot className="size-3" />
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-xs font-medium">
+                    {issue.assignee?.name || 'Agent'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    关于当前任务与 Agent 对话
+                  </p>
+                </div>
+              </div>
+
+              {/* Chat messages in bubble style */}
+              {comments.length > 0 && (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {comments.slice(-6).map((comment) => (
+                    <div
+                      key={comment.id}
+                      className={`flex ${comment.authorType === 'agent' ? 'justify-start' : 'justify-end'}`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                          comment.authorType === 'agent'
+                            ? 'bg-primary/10 text-foreground rounded-tl-none'
+                            : comment.authorType === 'system'
+                            ? 'bg-amber-500/10 text-foreground rounded-tr-none'
+                            : 'bg-teal-500/10 text-foreground rounded-tr-none'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          {comment.authorType === 'agent' && <Bot className="size-3 text-primary" />}
+                          <span className="text-[10px] font-medium text-muted-foreground">
+                            {comment.author?.name || 'System'}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground/60">
+                            {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: false, locale: zhCN })}
+                          </span>
+                        </div>
+                        <p className="whitespace-pre-wrap">{comment.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Typing indicator */}
+              {chatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-primary/10 rounded-lg px-3 py-2 rounded-tl-none">
+                    <div className="flex items-center gap-1.5">
+                      <Bot className="size-3 text-primary" />
+                      <div className="flex gap-1">
+                        <span className="size-1.5 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="size-1.5 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="size-1.5 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground ml-1">思考中...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Chat input */}
+              <div className="flex gap-2">
+                <Input
+                  placeholder={`向 ${issue.assignee?.name || 'Agent'} 提问...`}
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleChatWithAgent()
+                    }
+                  }}
+                  className="text-sm"
+                  disabled={chatLoading}
+                />
+                <Button
+                  size="icon"
+                  onClick={handleChatWithAgent}
+                  disabled={!chatMessage.trim() || chatLoading}
+                  className="shrink-0"
+                >
+                  {chatLoading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Send className="size-4" />
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {!issue.assigneeId && (
+            <p className="text-xs text-muted-foreground py-2">
+              指派一个 Agent 后即可开始对话
+            </p>
+          )}
+        </div>
+
+        <Separator className="mb-4" />
+
         {/* Comments */}
         <div className="mb-4">
           <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
@@ -759,6 +942,9 @@ function IssueDetailSheet({
           )}
         </div>
 
+        {/* Subtasks Section */}
+        <SubtasksSection issueId={issue.id} agents={agents} userId={userId} />
+
         {/* Timestamps */}
         <div className="text-[10px] text-muted-foreground space-y-1 mt-4 pt-4 border-t">
           <p>创建于 {formatDistanceToNow(new Date(issue.createdAt), { addSuffix: true, locale: zhCN })}</p>
@@ -773,6 +959,147 @@ function IssueDetailSheet({
 }
 
 // ==========================================
+// Subtasks Section Component
+// ==========================================
+
+function SubtasksSection({ issueId, agents, userId }: { issueId: string; agents: Member[]; userId: string | null }) {
+  const { data: subtasks, isLoading } = useSubtasks(issueId)
+  const createSubtask = useCreateSubtask()
+  const [showCreate, setShowCreate] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+
+  const subtaskList = subtasks || []
+  const completedCount = subtaskList.filter(s => s.status === 'resolved' || s.status === 'closed').length
+  const totalCount = subtaskList.length
+  const progressPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+
+  const handleCreate = () => {
+    if (!newTitle.trim() || !userId) return
+    createSubtask.mutate({
+      parentId: issueId,
+      data: {
+        title: newTitle.trim(),
+        creatorId: userId,
+      },
+    }, {
+      onSuccess: () => {
+        setNewTitle('')
+        setShowCreate(false)
+      },
+    })
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-sm font-medium flex items-center gap-2">
+          <List className="size-4" />
+          子任务
+          {totalCount > 0 && (
+            <Badge variant="secondary" className="text-[10px]">
+              {completedCount}/{totalCount}
+            </Badge>
+          )}
+        </h4>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs gap-1"
+          onClick={() => setShowCreate(!showCreate)}
+        >
+          <Plus className="size-3" />
+          添加
+        </Button>
+      </div>
+
+      {/* Progress bar */}
+      {totalCount > 0 && (
+        <div className="mb-3">
+          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+            <motion.div
+              className="h-full rounded-full bg-emerald-500"
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPct}%` }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+            />
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            {completedCount} 已完成 · {totalCount - completedCount} 待完成 · {progressPct}%
+          </p>
+        </div>
+      )}
+
+      {/* Create subtask input */}
+      {showCreate && (
+        <div className="flex gap-2 mb-3">
+          <Input
+            placeholder="输入子任务标题..."
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                handleCreate()
+              }
+            }}
+            className="text-sm"
+            autoFocus
+          />
+          <Button
+            size="icon"
+            onClick={handleCreate}
+            disabled={!newTitle.trim() || createSubtask.isPending}
+          >
+            {createSubtask.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Plus className="size-4" />
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* Subtask list */}
+      {isLoading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+      ) : subtaskList.length > 0 ? (
+        <div className="space-y-1 max-h-48 overflow-y-auto">
+          {subtaskList.map((subtask) => (
+            <div
+              key={subtask.id}
+              className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 transition-colors text-sm"
+            >
+              <span className={`size-2 rounded-full shrink-0 ${
+                subtask.status === 'resolved' || subtask.status === 'closed'
+                  ? 'bg-emerald-500'
+                  : subtask.status === 'in_progress'
+                  ? 'bg-amber-500'
+                  : 'bg-gray-400'
+              }`} />
+              <span className={`flex-1 truncate ${
+                subtask.status === 'resolved' || subtask.status === 'closed'
+                  ? 'line-through text-muted-foreground'
+                  : ''
+              }`}>
+                {subtask.title}
+              </span>
+              <Badge variant="outline" className="text-[9px] h-4 px-1.5 shrink-0">
+                {STATUS_LABELS[subtask.status] || subtask.status}
+              </Badge>
+            </div>
+          ))}
+        </div>
+      ) : !showCreate ? (
+        <p className="text-xs text-muted-foreground py-2 text-center">暂无子任务</p>
+      ) : null}
+    </div>
+  )
+}
+
+// ==========================================
 // Drag Overlay Card
 // ==========================================
 
@@ -781,7 +1108,7 @@ function DragOverlayCard({ issue }: { issue: Issue }) {
   const SceneIcon = (issue.scene && SCENE_ICONS[issue.scene]) || null
 
   return (
-    <Card className="shadow-2xl border-t-2 border-l-[3px] max-w-[320px] ring-2 ring-primary/20 bg-background/95 backdrop-blur-sm rotate-2">
+    <Card className="shadow-2xl border-t-2 border-l-[3px] max-w-[320px] ring-2 ring-primary/20 bg-background/95 backdrop-blur-sm rotate-[1.5deg] scale-[1.02]">
       <CardContent className="p-3 space-y-2">
         <div className="flex items-start gap-1.5">
           {SceneIcon && <SceneIcon className="size-3.5 mt-0.5 text-muted-foreground/60 shrink-0" />}
@@ -902,6 +1229,9 @@ export function BoardView() {
     setActiveId(event.active.id as string)
   }
 
+  // Track shake animation on specific card IDs
+  const [shakingCardId, setShakingCardId] = useState<string | null>(null)
+
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null)
     const { active, over } = event
@@ -922,6 +1252,15 @@ export function BoardView() {
             id: issueId,
             data: { status: targetColumn.id },
           })
+        } else {
+          // Invalid transition - show toast and shake animation
+          const fromLabel = STATUS_LABELS[issue.status] || issue.status
+          const toLabel = STATUS_LABELS[targetColumn.id] || targetColumn.id
+          toast.error(`无法将任务从「${fromLabel}」移动到「${toLabel}」，请遵循状态流转规则`)
+
+          // Trigger shake animation on the card
+          setShakingCardId(issueId)
+          setTimeout(() => setShakingCardId(null), 600)
         }
       }
     }
@@ -1078,6 +1417,7 @@ export function BoardView() {
                 issues={columnIssues[col.id] || []}
                 onIssueClick={handleIssueClick}
                 onQuickAction={handleQuickAction}
+                shakingCardId={shakingCardId}
               />
             ))}
           </div>
@@ -1167,7 +1507,7 @@ export function BoardView() {
                 >
                   <span className="flex items-center gap-1">
                     标题
-                    <ArrowUpDown className="size-3 opacity-50" />
+                    {sortField === 'title' ? <ArrowUpDown className="size-3 text-primary" /> : <ArrowUpDown className="size-3 opacity-30" />}
                   </span>
                 </TableHead>
                 <TableHead className="hidden md:table-cell">场景</TableHead>
@@ -1181,7 +1521,7 @@ export function BoardView() {
                 >
                   <span className="flex items-center gap-1">
                     状态
-                    <ArrowUpDown className="size-3 opacity-50" />
+                    {sortField === 'status' ? <ArrowUpDown className="size-3 text-primary" /> : <ArrowUpDown className="size-3 opacity-30" />}
                   </span>
                 </TableHead>
                 <TableHead
@@ -1193,7 +1533,7 @@ export function BoardView() {
                 >
                   <span className="flex items-center gap-1">
                     创建时间
-                    <ArrowUpDown className="size-3 opacity-50" />
+                    {sortField === 'createdAt' ? <ArrowUpDown className="size-3 text-primary" /> : <ArrowUpDown className="size-3 opacity-30" />}
                   </span>
                 </TableHead>
                 <TableHead className="w-10" />
@@ -1223,7 +1563,7 @@ export function BoardView() {
                   return (
                     <TableRow
                       key={issue.id}
-                      className={`cursor-pointer hover:bg-muted/50 transition-colors ${isSelected ? 'bg-primary/5' : ''}`}
+                      className={`cursor-pointer hover:bg-muted/50 transition-colors ${isSelected ? 'bg-primary/5' : 'even:bg-muted/20'}`}
                       onClick={() => handleIssueClick(issue)}
                     >
                       <TableCell onClick={(e) => e.stopPropagation()}>

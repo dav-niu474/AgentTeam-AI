@@ -182,7 +182,7 @@ function SessionDetailDialog({
                           </AvatarFallback>
                         </Avatar>
                       )}
-                      <div className={`${getMessageBubbleStyle(msg.role)} px-3 py-2`}>
+                      <div className={`${getMessageBubbleStyle(msg.role)} px-4 py-2.5`}>
                         {!isSystem && (
                           <div className="flex items-center gap-1.5 mb-1">
                             <span className="text-[10px] font-medium text-muted-foreground">
@@ -253,7 +253,7 @@ function SessionCard({
   const messageCount = session.messageCount ?? 0
 
   return (
-    <Card className="hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 group">
+    <Card className={`hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 group border-l-[3px] ${session.status === 'active' ? 'border-l-emerald-500' : session.status === 'paused' ? 'border-l-amber-500' : 'border-l-gray-300'}`}>
       <CardContent className="p-4 space-y-3">
         {/* Header: Agent + Status */}
         <div className="flex items-center justify-between">
@@ -573,7 +573,7 @@ export function SessionsView() {
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col items-center justify-center py-20 text-muted-foreground"
           >
-            <Terminal className="size-14 mb-4 opacity-20" />
+            <Terminal className="size-14 mb-4 opacity-20 animate-bounce-subtle" />
             <p className="text-base font-medium mb-1">暂无会话记录</p>
             <p className="text-sm text-muted-foreground/70">
               {sessions && sessions.length > 0

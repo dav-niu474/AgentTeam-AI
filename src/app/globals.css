@@ -122,8 +122,12 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    transition: background-color 300ms ease, color 300ms ease;
+  }
   body {
     @apply bg-background text-foreground;
+    transition: background-color 300ms ease, color 300ms ease;
   }
 }
 
@@ -138,8 +142,8 @@
   }
 
   *::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
   }
 
   *::-webkit-scrollbar-track {
@@ -148,7 +152,7 @@
 
   *::-webkit-scrollbar-thumb {
     background: var(--border);
-    border-radius: 3px;
+    border-radius: 999px;
   }
 
   *::-webkit-scrollbar-thumb:hover {
@@ -342,6 +346,78 @@
     color: oklch(0.65 0.17 160);
   }
 
+  /* Staggered card entrance animation */
+  .animate-fade-slide-in {
+    animation: fadeSlideIn 0.4s ease-out both;
+  }
+
+  /* Soft pulse for status indicators */
+  .animate-pulse-soft {
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+
+  /* Subtle bounce for notifications */
+  .animate-bounce-subtle {
+    animation: bounce-subtle 2s ease-in-out infinite;
+  }
+
+  /* Flowing arrow for pipeline connectors */
+  .animate-arrow-flow {
+    animation: arrow-flow 1.5s ease-in-out infinite;
+  }
+
+  /* Glow pulse for online agent cards */
+  .animate-glow-pulse {
+    animation: glow-pulse 3s ease-in-out infinite;
+  }
+
+  /* Card hover gradient effect */
+  .card-hover-gradient {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-hover-gradient::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 40%, oklch(0.55 0.17 160 / 5%) 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+
+  .card-hover-gradient:hover::after {
+    opacity: 1;
+  }
+
+  .dark .card-hover-gradient::after {
+    background: linear-gradient(135deg, transparent 40%, oklch(0.65 0.17 160 / 4%) 100%);
+  }
+
+  /* Smooth interactive element transitions */
+  .interactive-transition {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .interactive-transition:hover {
+    transform: translateY(-1px);
+  }
+
+  .interactive-transition:active {
+    transform: translateY(0);
+  }
+
+  /* Shake animation for invalid drag */
+  .animate-shake {
+    animation: shake 0.5s ease-in-out;
+  }
+
+  /* Flash red for invalid state */
+  .animate-flash-red {
+    animation: flash-red 0.6s ease-in-out;
+  }
+
   /* Gradient border utility */
   .border-gradient {
     border: 1px solid transparent;
@@ -480,4 +556,68 @@
   to {
     stroke-dashoffset: var(--ring-offset, 0);
   }
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes bounce-subtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes arrow-flow {
+  0% {
+    opacity: 0.3;
+    transform: translateX(-4px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(0px);
+  }
+  100% {
+    opacity: 0.3;
+    transform: translateX(4px);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 oklch(0.55 0.17 160 / 0%);
+  }
+  50% {
+    box-shadow: 0 0 8px 2px oklch(0.55 0.17 160 / 20%);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+@keyframes flash-red {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: oklch(0.577 0.245 27.325 / 10%); }
 }

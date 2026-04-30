@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Bot, Plus, Wifi, WifiOff, Clock, Eye, Trash2,
   Code2, FileCheck, FileText, BarChart3, Wrench, TestTube2, GitBranch,
-  X, Save, Users, Sparkles,
+  X, Save, Users, Sparkles, History, CheckCircle2, AlertCircle, Timer,
+  ListChecks, TrendingUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,6 +33,8 @@ import {
 import { parseJsonField, type Member } from '@/lib/api'
 import { useCurrentUser } from '@/lib/use-current-user'
 import { toast } from 'sonner'
+import { formatDistanceToNow } from 'date-fns'
+import { zhCN } from 'date-fns/locale'
 
 // ============ Constants ============
 
@@ -108,12 +111,39 @@ function getStatusColor(status: string | null) {
   }
 }
 
+const STATUS_CARD_GRADIENTS: Record<string, string> = {
+  online: 'from-emerald-50 via-emerald-50/50 to-transparent dark:from-emerald-900/20 dark:via-emerald-900/10',
+  busy: 'from-amber-50 via-amber-50/50 to-transparent dark:from-amber-900/20 dark:via-amber-900/10',
+  offline: 'from-gray-50 via-gray-50/30 to-transparent dark:from-gray-800/20 dark:via-gray-800/10',
+}
+
 function getStatusLabel(status: string | null) {
   switch (status) {
     case 'online': return '在线'
     case 'busy': return '忙碌'
     default: return '离线'
   }
+}
+
+// ============ Mini Progress Ring ============
+
+function MiniProgressRing({ value, size = 28, strokeWidth = 3 }: { value: number; size?: number; strokeWidth?: number }) {
+  const radius = (size - strokeWidth) / 2
+  const circumference = radius * 2 * Math.PI
+  const offset = circumference - (value / 100) * circumference
+  const color = value >= 80 ? '#10b981' : value >= 50 ? '#f59e0b' : '#94a3b8'
+
+  return (
+    <div className="relative">
+      <svg width={size} height={size} className="transform -rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor" strokeWidth={strokeWidth} className="text-muted/30" />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset} style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold" style={{ color }}>
+        {value}%
+      </span>
+    </div>
+  )
 }
 
 // ============ Register Agent Dialog ============
@@ -304,6 +334,50 @@ function AgentDetailSheet({
 
   const capabilities = parseJsonField<string[]>(agent?.capabilities, [])
   const assignedIssues = agentIssues || []
+
+  const completionRate = useMemo(() => {
+    if (!assignedIssues.length) return 0
+    const completed = assignedIssues.filter(i => i.status === 'resolved' || i.status === 'closed').length
+    return Math.round((completed / assignedIssues.length) * 100)
+  }, [assignedIssues])
+
+  // Execution history: all issues assigned to this agent, organized as a timeline
+  const executionHistory = useMemo(() => {
+    if (!assignedIssues.length) return []
+    return assignedIssues.map((issue) => {
+      const statusIcon = issue.status === 'resolved' || issue.status === 'closed'
+        ? CheckCircle2
+        : issue.status === 'in_progress'
+        ? AlertCircle
+        : Clock
+      const statusColor = issue.status === 'resolved' || issue.status === 'closed'
+        ? 'text-emerald-500'
+        : issue.status === 'in_progress'
+        ? 'text-amber-500'
+        : issue.status === 'in_review'
+        ? 'text-teal-500'
+        : 'text-gray-400'
+
+      const priorityColor = issue.priority === 'urgent' ? 'bg-red-500' :
+        issue.priority === 'high' ? 'bg-orange-500' :
+        issue.priority === 'medium' ? 'bg-teal-500' :
+        'bg-gray-400'
+
+      return {
+        id: issue.id,
+        title: issue.title,
+        status: issue.status,
+        priority: issue.priority,
+        scene: issue.scene,
+        statusIcon,
+        statusColor,
+        priorityColor,
+        createdAt: issue.createdAt,
+        updatedAt: issue.updatedAt,
+        resolvedAt: issue.resolvedAt,
+      }
+    })
+  }, [assignedIssues])
 
   const handleOpen = (isOpen: boolean) => {
     if (isOpen && agent) {
@@ -507,7 +581,11 @@ function AgentDetailSheet({
 
           {/* Current Assignments */}
           <div>
-            <h4 className="text-sm font-medium mb-2">当前任务</h4>
+            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+              <ListChecks className="size-4" />
+              当前任务
+              <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{assignedIssues.length}</Badge>
+            </h4>
             {assignedIssues.length > 0 ? (
               <div className="space-y-1.5">
                 {assignedIssues.slice(0, 5).map((issue) => (
@@ -533,6 +611,17 @@ function AgentDetailSheet({
             )}
           </div>
 
+          {/* Completion Rate */}
+          {assignedIssues.length > 0 && (
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-muted/20">
+              <div>
+                <p className="text-sm font-medium">完成率</p>
+                <p className="text-xs text-muted-foreground">{assignedIssues.filter(i => i.status === 'resolved' || i.status === 'closed').length}/{assignedIssues.length} 个任务已完成</p>
+              </div>
+              <MiniProgressRing value={completionRate} size={40} strokeWidth={4} />
+            </div>
+          )}
+
           {/* Recent Activity */}
           <div>
             <h4 className="text-sm font-medium mb-2">最近活动</h4>
@@ -543,7 +632,7 @@ function AgentDetailSheet({
                     key={log.id}
                     className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground border border-border/30"
                   >
-                    <span className="text-[10px] opacity-60">
+                    <span className="text-[10px] opacity-60 tabular-nums">
                       {new Date(log.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     <span className="font-medium text-foreground/70">{log.action}</span>
@@ -553,6 +642,88 @@ function AgentDetailSheet({
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">暂无活动记录</p>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Execution History */}
+          <div>
+            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+              <History className="size-4" />
+              执行历史
+            </h4>
+            {executionHistory.length > 0 ? (
+              <div className="relative">
+                {/* Timeline line */}
+                <div className="absolute left-[11px] top-2 bottom-2 w-px bg-border/50" />
+
+                <div className="space-y-3">
+                  {executionHistory.map((item) => {
+                    const StatusIcon = item.statusIcon
+                    const sceneLabel = item.scene === 'code-gen' ? '代码生成' :
+                      item.scene === 'doc' ? '文档' :
+                      item.scene === 'analysis' ? '分析' :
+                      item.scene === 'review' ? '审查' : item.scene || ''
+
+                    return (
+                      <div key={item.id} className="flex gap-3 relative">
+                        {/* Timeline dot */}
+                        <div className="flex flex-col items-center shrink-0">
+                          <div className={`size-[22px] rounded-full bg-background border-2 flex items-center justify-center z-10 ${
+                            item.status === 'resolved' || item.status === 'closed'
+                              ? 'border-emerald-500/50'
+                              : item.status === 'in_progress'
+                              ? 'border-amber-500/50'
+                              : 'border-border'
+                          }`}>
+                            <StatusIcon className={`size-3 ${item.statusColor}`} />
+                          </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0 pb-1">
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{item.title}</p>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <Badge variant="outline" className="text-[9px] h-4 px-1.5">
+                                  {item.status === 'open' ? '待处理' :
+                                   item.status === 'triaged' ? '已分诊' :
+                                   item.status === 'in_progress' ? '进行中' :
+                                   item.status === 'in_review' ? '待审查' :
+                                   item.status === 'resolved' ? '已解决' :
+                                   item.status === 'closed' ? '已关闭' : item.status}
+                                </Badge>
+                                <span className={`size-1.5 rounded-full ${item.priorityColor}`} />
+                                {sceneLabel && (
+                                  <span className="text-[10px] text-muted-foreground">{sceneLabel}</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-muted-foreground">
+                                <Timer className="size-3" />
+                                <span>创建 {new Date(item.createdAt).toLocaleDateString('zh-CN')}</span>
+                                {item.resolvedAt && (
+                                  <>
+                                    <span>→</span>
+                                    <span>完成 {new Date(item.resolvedAt).toLocaleDateString('zh-CN')}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                <History className="size-8 mb-2 opacity-20" />
+                <p className="text-xs">暂无执行历史</p>
+                <p className="text-[10px] mt-1 opacity-60">指派任务后将显示执行记录</p>
+              </div>
             )}
           </div>
         </div>
@@ -610,7 +781,7 @@ export function AgentsView() {
   }
 
   return (
-    <div className="space-y-6 p-6 h-full overflow-y-auto">
+    <div className="space-y-6 p-4 md:p-6 h-full overflow-y-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -631,7 +802,7 @@ export function AgentsView() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }}>
           <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 dark:hover:border-emerald-600">
             <CardContent className="flex items-center gap-3 p-4 relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 via-emerald-50/50 to-transparent dark:from-emerald-900/20 dark:via-emerald-900/10 transition-opacity duration-500" />
               <div className="flex size-10 items-center justify-center rounded-full bg-emerald-500/10 relative">
                 <Wifi className="size-5 text-emerald-500" />
               </div>
@@ -641,7 +812,7 @@ export function AgentsView() {
               </div>
               {statusCounts.online > 0 && (
                 <motion.div
-                  className="ml-auto size-2 rounded-full bg-emerald-500"
+                  className="ml-auto size-2 rounded-full bg-emerald-500 animate-pulse-soft shadow-[0_0_6px_rgba(16,185,129,0.5)]"
                   animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
                   transition={{ duration: 2, repeat: Infinity }}
                 />
@@ -652,7 +823,7 @@ export function AgentsView() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
           <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-amber-300 dark:hover:border-amber-600">
             <CardContent className="flex items-center gap-3 p-4 relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-amber-50/50 to-transparent dark:from-amber-900/20 dark:via-amber-900/10 transition-opacity duration-500" />
               <div className="flex size-10 items-center justify-center rounded-full bg-amber-500/10 relative">
                 <Clock className="size-5 text-amber-500" />
               </div>
@@ -702,6 +873,10 @@ export function AgentsView() {
             {agents.map((agent, i) => {
               const caps = parseJsonField<string[]>(agent.capabilities, [])
               const groupGradient = AGENT_GROUP_GRADIENTS[agent.agentGroup || ''] || 'from-primary/5 via-primary/3 to-transparent'
+              const taskCount = agent.assignedIssues?.length || 0
+              const completedTasks = agent.assignedIssues?.filter(iss => iss.status === 'resolved' || iss.status === 'closed').length || 0
+              const completionRate = taskCount > 0 ? Math.round((completedTasks / taskCount) * 100) : 0
+
               return (
                 <motion.div
                   key={agent.id}
@@ -711,15 +886,15 @@ export function AgentsView() {
                   transition={{ delay: i * 0.05 }}
                 >
                   <Card
-                    className="group hover:shadow-lg transition-all duration-300 cursor-pointer hover:-translate-y-1 overflow-hidden relative hover:border-primary/30"
+                    className={`group hover:shadow-lg transition-all duration-300 cursor-pointer hover:-translate-y-1 overflow-hidden relative hover:border-primary/30 ${agent.agentStatus === 'online' ? 'animate-glow-pulse' : ''}`}
                     onClick={() => handleViewDetails(agent)}
                   >
-                    {/* Group-based gradient background */}
-                    <div className={`absolute inset-0 bg-gradient-to-br ${groupGradient} opacity-60 group-hover:opacity-100 transition-opacity duration-300`} />
-                    <CardContent className="p-6 relative">
-                      <div className="flex items-start gap-4">
+                    {/* Status-based gradient background */}
+                    <div className={`absolute inset-0 bg-gradient-to-br ${STATUS_CARD_GRADIENTS[agent.agentStatus || 'offline'] || groupGradient} opacity-60 group-hover:opacity-100 transition-opacity duration-500`} />
+                    <CardContent className="p-5 relative">
+                      <div className="flex items-start gap-3">
                         {/* Avatar with gradient */}
-                        <div className={`flex size-12 items-center justify-center rounded-full text-white font-semibold shrink-0 bg-gradient-to-br ${getAvatarColor(agent.name)} shadow-md group-hover:shadow-lg transition-shadow`}>
+                        <div className={`flex size-11 items-center justify-center rounded-full text-white font-semibold shrink-0 bg-gradient-to-br ${getAvatarColor(agent.name)} shadow-md group-hover:shadow-lg transition-shadow`}>
                           {agent.name.charAt(0).toUpperCase()}
                         </div>
 
@@ -729,7 +904,7 @@ export function AgentsView() {
                             <h3 className="font-semibold text-sm truncate">{agent.name}</h3>
                             <motion.span
                               className={`size-2 rounded-full shrink-0 ${getStatusColor(agent.agentStatus)}`}
-                              animate={agent.agentStatus === 'online' ? { scale: [1, 1.3, 1] } : {}}
+                              animate={agent.agentStatus === 'online' ? { scale: [1, 1.3, 1] } : agent.agentStatus === 'busy' ? { opacity: [1, 0.5, 1] } : {}}
                               transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                             />
                           </div>
@@ -739,33 +914,50 @@ export function AgentsView() {
                             {agent.agentGroup && ` · ${agent.agentGroup}`}
                           </p>
 
-                          {/* Capabilities - pill style */}
+                          {/* Skill tags - first 2-3 */}
                           <div className="flex flex-wrap gap-1 mt-2">
                             {caps.slice(0, 3).map((cap) => {
                               const option = CAPABILITY_OPTIONS.find(c => c.value === cap)
+                              const CapIcon = option?.icon
                               return (
-                                <Badge key={cap} variant="secondary" className={`text-[10px] h-5 px-2 gap-0.5 rounded-full bg-gradient-to-r ${option?.gradient || 'from-muted to-muted'}`}>
+                                <Badge key={cap} variant="secondary" className={`text-[9px] h-4 px-1.5 gap-0.5 rounded-full bg-gradient-to-r ${option?.gradient || 'from-muted to-muted'}`}>
+                                  {CapIcon && <CapIcon className="size-2.5" />}
                                   {option?.label || cap}
                                 </Badge>
                               )
                             })}
                             {caps.length > 3 && (
-                              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 rounded-full">
+                              <Badge variant="secondary" className="text-[9px] h-4 px-1.5 rounded-full">
                                 +{caps.length - 3}
                               </Badge>
                             )}
                           </div>
-
-                          {/* Current task hint */}
-                          {agent.assignedIssues && agent.assignedIssues.length > 0 && (
-                            <p className="text-xs text-muted-foreground mt-2 truncate">
-                              📋 {agent.assignedIssues[0].title}
-                            </p>
-                          )}
                         </div>
+
+                        {/* Completion rate mini-ring */}
+                        {taskCount > 0 && (
+                          <MiniProgressRing value={completionRate} size={32} strokeWidth={3} />
+                        )}
                       </div>
 
-                      <div className="flex justify-end mt-4">
+                      {/* Bottom row: Tasks counter + Last active */}
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/30">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <ListChecks className="size-3" />
+                          <span>任务: {taskCount}</span>
+                          {taskCount > 0 && completedTasks > 0 && (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">({completedTasks} 完成)</span>
+                          )}
+                        </div>
+                        {agent.updatedAt && (
+                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
+                            <Clock className="size-2.5" />
+                            {formatDistanceToNow(new Date(agent.updatedAt), { addSuffix: true, locale: zhCN })}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end mt-2">
                         <Button
                           variant="ghost"
                           size="sm"

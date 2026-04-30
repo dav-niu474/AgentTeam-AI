@@ -66,6 +66,17 @@ export interface Issue {
     content: string
     status: string
   } | null
+  parentIssue?: {
+    id: string
+    title: string
+    status: string
+  } | null
+  childIssues?: {
+    id: string
+    title: string
+    status: string
+    priority: string
+  }[]
   _count?: {
     comments: number
     childIssues: number
@@ -189,6 +200,23 @@ export interface MemoryEntry {
   updatedAt: string
 }
 
+export interface AgentPerformance {
+  id: string
+  name: string
+  avatar: string | null
+  agentStatus: string | null
+  tasks: { total: number; completed: number; inProgress: number; open: number }
+  completionRate: number
+  avgResolutionHours: number
+}
+
+export interface WeeklyActivity {
+  date: string
+  count: number
+  agentCount: number
+  humanCount: number
+}
+
 export interface Stats {
   issues: {
     total: number
@@ -206,6 +234,8 @@ export interface Stats {
   sessions: { active: number }
   daemons: { online: number }
   recentActivity: AuditLog[]
+  agentPerformance: AgentPerformance[]
+  weeklyActivity: WeeklyActivity[]
 }
 
 // ============ Generic Fetch Helper ============
@@ -290,6 +320,7 @@ export interface IssuesParams {
   creatorId?: string
   priority?: string
   scene?: string
+  parentIssueId?: string
 }
 
 export interface CreateIssueData {
@@ -327,6 +358,7 @@ export const issuesApi = {
     if (params?.creatorId) search.set('creatorId', params.creatorId)
     if (params?.priority) search.set('priority', params.priority)
     if (params?.scene) search.set('scene', params.scene)
+    if (params?.parentIssueId) search.set('parentIssueId', params.parentIssueId)
     const query = search.toString()
     return apiFetch<Issue[]>(`/api/issues${query ? `?${query}` : ''}`)
   },
@@ -339,6 +371,9 @@ export const issuesApi = {
     apiFetch<{ success: boolean }>(`/api/issues/${id}`, { method: 'DELETE' }),
   updateStatus: (id: string, data: IssueStatusTransition) =>
     apiFetch<Issue>(`/api/issues/${id}/status`, { method: 'PATCH', body: JSON.stringify(data) }),
+  subtasks: (id: string) => apiFetch<Issue[]>(`/api/issues/${id}/subtasks`),
+  createSubtask: (parentId: string, data: Omit<CreateIssueData, 'parentIssueId'>) =>
+    apiFetch<Issue>(`/api/issues/${parentId}/subtasks`, { method: 'POST', body: JSON.stringify(data) }),
 }
 
 // ============ Comments ============
@@ -572,6 +607,17 @@ export const memoryApi = {
 }
 
 // ============ Agents (Auto-assign & Scan) ============
+
+export interface AgentStatsResult {
+  agentId: string
+  agentName: string
+  tasks: { total: number; completed: number; inProgress: number; open: number }
+  completionRate: number
+  avgResolutionHours: number
+  dailyCompleted: { date: string; count: number }[]
+  sceneDistribution: { scene: string; count: number }[]
+  weeklyActivity: { date: string; count: number }[]
+}
 
 export interface AutoAssignResult {
   recommended: {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { formatDistanceToNow, isToday, isYesterday } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import {
@@ -30,6 +30,7 @@ import {
   ScanSearch,
   Eye,
   ListChecks,
+  Calendar,
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { Button } from '@/components/ui/button'
@@ -43,7 +44,7 @@ import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStats, useAgents, useAuditLogs, useInspirations } from '@/lib/hooks'
 import { parseJsonField } from '@/lib/api'
-import type { AuditLog } from '@/lib/api'
+import type { AuditLog, AgentPerformance, WeeklyActivity } from '@/lib/api'
 
 const container = {
   hidden: { opacity: 0 },
@@ -249,11 +250,11 @@ function useTimeGreeting() {
 // ============ Animated Stat Card ============
 
 const STAT_GRADIENTS = [
-  'from-slate-500/10 via-slate-500/5 to-transparent',
-  'from-emerald-500/10 via-emerald-500/5 to-transparent',
-  'from-purple-500/10 via-purple-500/5 to-transparent',
-  'from-green-500/10 via-green-500/5 to-transparent',
-  'from-teal-500/10 via-teal-500/5 to-transparent',
+  'from-slate-100 via-slate-50 to-transparent dark:from-slate-800/40 dark:via-slate-800/20',
+  'from-emerald-50 via-emerald-50/50 to-transparent dark:from-emerald-900/30 dark:via-emerald-900/15',
+  'from-purple-50 via-purple-50/50 to-transparent dark:from-purple-900/30 dark:via-purple-900/15',
+  'from-green-50 via-green-50/50 to-transparent dark:from-green-900/30 dark:via-green-900/15',
+  'from-teal-50 via-teal-50/50 to-transparent dark:from-teal-900/30 dark:via-teal-900/15',
 ]
 
 const STAT_BORDERS = [
@@ -360,8 +361,9 @@ function PipelineStage({ label, count, color, isLast, icon: Icon }: { label: str
           initial={{ opacity: 0, x: -4 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3, duration: 0.3 }}
+          className="animate-arrow-flow"
         >
-          <ChevronRight className="size-5 text-muted-foreground/50 mx-0.5 shrink-0" />
+          <ArrowRight className="size-4 text-primary/40 mx-1 shrink-0" />
         </motion.div>
       )}
     </div>
@@ -399,6 +401,185 @@ function groupActivitiesByDate(logs: AuditLog[]): ActivityGroup[] {
   return groups
 }
 
+// ============ Time Range Selector ============
+
+type TimeRange = 'today' | '7d' | '30d' | 'all'
+
+const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
+  { value: 'today', label: '今日' },
+  { value: '7d', label: '7天' },
+  { value: '30d', label: '30天' },
+  { value: 'all', label: '全部' },
+]
+
+function TimeRangeSelector({ value, onChange }: { value: TimeRange; onChange: (v: TimeRange) => void }) {
+  return (
+    <div className="flex items-center gap-1 rounded-lg bg-muted/60 p-1 border border-border/50">
+      {TIME_RANGE_OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={`relative px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+            value === opt.value
+              ? 'text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
+          }`}
+        >
+          {value === opt.value && (
+            <motion.div
+              layoutId="time-range-indicator"
+              className="absolute inset-0 bg-primary rounded-md shadow-sm"
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center gap-1.5">
+            <Calendar className="size-3" />
+            {opt.label}
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ============ Agent Performance Row ============
+
+function AgentPerformanceRow({ performance }: { performance: AgentPerformance }) {
+  const { tasks, completionRate, avgResolutionHours, name, agentStatus } = performance
+  const maxVal = Math.max(tasks.completed, tasks.inProgress, tasks.open, 1)
+
+  const rateColor = completionRate > 80 ? 'text-emerald-500' : completionRate > 50 ? 'text-amber-500' : 'text-red-500'
+  const rateBg = completionRate > 80 ? 'bg-emerald-500/10 border-emerald-500/30' : completionRate > 50 ? 'bg-amber-500/10 border-amber-500/30' : 'bg-red-500/10 border-red-500/30'
+
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/30 hover:bg-muted/50 transition-colors">
+      {/* Status dot */}
+      <span className={`size-2 rounded-full shrink-0 ${
+        agentStatus === 'online' ? 'bg-emerald-500 animate-pulse' : agentStatus === 'busy' ? 'bg-amber-500' : 'bg-gray-400'
+      }`} />
+
+      {/* Name */}
+      <span className="text-sm font-medium min-w-[80px] truncate">{name}</span>
+
+      {/* Mini bar chart */}
+      <div className="flex items-end gap-0.5 h-6">
+        <div
+          className="w-3 rounded-t-sm bg-emerald-500/70 transition-all duration-500"
+          style={{ height: `${Math.max((tasks.completed / maxVal) * 24, 2)}px` }}
+          title={`完成: ${tasks.completed}`}
+        />
+        <div
+          className="w-3 rounded-t-sm bg-amber-500/70 transition-all duration-500"
+          style={{ height: `${Math.max((tasks.inProgress / maxVal) * 24, 2)}px` }}
+          title={`进行中: ${tasks.inProgress}`}
+        />
+        <div
+          className="w-3 rounded-t-sm bg-slate-400/70 transition-all duration-500"
+          style={{ height: `${Math.max((tasks.open / maxVal) * 24, 2)}px` }}
+          title={`待处理: ${tasks.open}`}
+        />
+      </div>
+
+      {/* Counts */}
+      <span className="text-xs text-muted-foreground tabular-nums">
+        <span className="text-emerald-600 font-medium">{tasks.completed}</span>
+        <span className="mx-0.5">/</span>
+        <span className="text-amber-600 font-medium">{tasks.inProgress}</span>
+        <span className="mx-0.5">/</span>
+        <span>{tasks.open}</span>
+      </span>
+
+      <div className="flex-1" />
+
+      {/* Avg resolution time */}
+      <span className="text-xs text-muted-foreground whitespace-nowrap">
+        <Clock className="size-3 inline mr-0.5" />
+        {avgResolutionHours > 0 ? `${avgResolutionHours}h` : '—'}
+      </span>
+
+      {/* Completion rate badge */}
+      <Badge variant="outline" className={`text-[10px] h-5 px-1.5 border ${rateBg} ${rateColor} font-bold`}>
+        {completionRate}%
+      </Badge>
+    </div>
+  )
+}
+
+// ============ Weekly Heatmap ============
+
+function WeeklyHeatmap({ data }: { data: WeeklyActivity[] }) {
+  const maxCount = Math.max(...data.map(d => d.count), 1)
+  const dayLabels = ['日', '一', '二', '三', '四', '五', '六']
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-7 gap-2">
+        {data.map((day, i) => {
+          const intensity = day.count / maxCount
+          const date = new Date(day.date)
+          const dayOfWeek = date.getDay()
+          const bgOpacity = Math.max(intensity * 0.8, 0.05)
+          const isToday = new Date().toISOString().split('T')[0] === day.date
+
+          return (
+            <div key={day.date} className="flex flex-col items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground">周{dayLabels[dayOfWeek]}</span>
+              <motion.div
+                className={`size-10 rounded-lg flex items-center justify-center text-xs font-medium relative border ${
+                  isToday ? 'border-primary/50 ring-1 ring-primary/20' : 'border-border/30'
+                }`}
+                style={{
+                  backgroundColor: `rgba(16, 185, 129, ${bgOpacity})`,
+                }}
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: i * 0.05, duration: 0.2 }}
+                title={`${day.date}: ${day.count} 活动 (Agent: ${day.agentCount}, 人类: ${day.humanCount})`}
+              >
+                <span className={day.count > 0 ? 'text-foreground' : 'text-muted-foreground/50'}>
+                  {day.count}
+                </span>
+                {day.count > 0 && (
+                  <div className="absolute bottom-0.5 left-0.5 right-0.5 flex gap-0.5">
+                    <div
+                      className="h-0.5 rounded-full bg-primary/60 flex-1"
+                      style={{ maxWidth: `${Math.max((day.agentCount / day.count) * 100, 10)}%` }}
+                    />
+                    <div
+                      className="h-0.5 rounded-full bg-teal-500/60 flex-1"
+                    />
+                  </div>
+                )}
+              </motion.div>
+              <span className="text-[9px] text-muted-foreground/60 tabular-nums">
+                {date.getDate()}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <span className="size-2 rounded-sm bg-primary/60" /> Agent
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="size-2 rounded-sm bg-teal-500/60" /> 人类
+        </div>
+        <div className="flex items-center gap-1">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <span
+              key={i}
+              className="size-2 rounded-sm"
+              style={{ backgroundColor: `rgba(16, 185, 129, ${i * 0.2})` }}
+            />
+          ))}
+          <span className="ml-0.5">少 → 多</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ============ Main Dashboard View ============
 
 export function DashboardView() {
@@ -416,6 +597,7 @@ export function DashboardView() {
     recommendations: string[]
   } | null>(null)
   const [agentScanning, setAgentScanning] = useState(false)
+  const [timeRange, setTimeRange] = useState<TimeRange>('all')
   const greeting = useTimeGreeting()
   const GreetingIcon = greeting.icon
 
@@ -513,25 +695,28 @@ export function DashboardView() {
       animate="show"
       className="space-y-6 p-4 md:p-6 bg-pattern-dots min-h-full"
     >
-      {/* Header with greeting */}
+      {/* Header with greeting + Time Range Selector */}
       <motion.div variants={item}>
-        <div className="flex items-center gap-2">
-          <motion.div
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-            className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5"
-          >
-            <GreetingIcon className="size-5 text-primary" />
-          </motion.div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              <span className="gradient-text">{greeting.text}</span>！
-            </h1>
-            <p className="text-muted-foreground mt-0.5">
-              这里是你的工作总览
-            </p>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <motion.div
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+              className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5"
+            >
+              <GreetingIcon className="size-5 text-primary" />
+            </motion.div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">
+                <span className="gradient-text">{greeting.text}</span>！
+              </h1>
+              <p className="text-muted-foreground mt-0.5">
+                这里是你的工作总览
+              </p>
+            </div>
           </div>
+          <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
         </div>
       </motion.div>
 
@@ -565,116 +750,125 @@ export function DashboardView() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-        {statsLoading ? (
-          <>
-            <StatsCardSkeleton />
-            <StatsCardSkeleton />
-            <StatsCardSkeleton />
-            <StatsCardSkeleton />
-            <StatsCardSkeleton />
-          </>
-        ) : (
-          <>
-            <motion.div variants={item}>
-              <AnimatedStatCard
-                title="全部任务"
-                value={stats?.issues.total || 0}
-                subtitle={
-                  stats?.issues.total
-                    ? `${stats.issues.byStatus.open || 0} 个待处理`
-                    : '暂无任务'
-                }
-                icon={ListTodo}
-                iconColor="text-slate-500"
-                sparkData={sparkDataTotal}
-                sparkColor="#94a3b8"
-                gradientIndex={0}
-              />
-            </motion.div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={timeRange}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.3 }}
+          className="grid gap-4 grid-cols-2 lg:grid-cols-5"
+        >
+          {statsLoading ? (
+            <>
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+              <StatsCardSkeleton />
+            </>
+          ) : (
+            <>
+              <motion.div variants={item}>
+                <AnimatedStatCard
+                  title="全部任务"
+                  value={stats?.issues.total || 0}
+                  subtitle={
+                    stats?.issues.total
+                      ? `${stats.issues.byStatus.open || 0} 个待处理`
+                      : '暂无任务'
+                  }
+                  icon={ListTodo}
+                  iconColor="text-slate-500"
+                  sparkData={sparkDataTotal}
+                  sparkColor="#94a3b8"
+                  gradientIndex={0}
+                />
+              </motion.div>
 
-            <motion.div variants={item}>
-              <AnimatedStatCard
-                title="进行中"
-                value={stats?.issues.byStatus.in_progress || 0}
-                subtitle={
-                  stats?.issues.byStatus.in_review
-                    ? `${stats.issues.byStatus.in_review} 个待审查`
-                    : '暂无进行中的任务'
-                }
-                icon={Clock}
-                iconColor="text-emerald-500"
-                sparkData={sparkDataProgress}
-                sparkColor="#10b981"
-                gradientIndex={1}
-              />
-            </motion.div>
+              <motion.div variants={item}>
+                <AnimatedStatCard
+                  title="进行中"
+                  value={stats?.issues.byStatus.in_progress || 0}
+                  subtitle={
+                    stats?.issues.byStatus.in_review
+                      ? `${stats.issues.byStatus.in_review} 个待审查`
+                      : '暂无进行中的任务'
+                  }
+                  icon={Clock}
+                  iconColor="text-emerald-500"
+                  sparkData={sparkDataProgress}
+                  sparkColor="#10b981"
+                  gradientIndex={1}
+                />
+              </motion.div>
 
-            <motion.div variants={item}>
-              <AnimatedStatCard
-                title="Agent 状态"
-                value={stats?.agents.total || 0}
-                subtitle={
-                  stats?.agents.total ? (
-                    <span className="flex items-center gap-2">
-                      <span className="flex items-center gap-1">
-                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        {stats.agents.byStatus.online}
+              <motion.div variants={item}>
+                <AnimatedStatCard
+                  title="Agent 状态"
+                  value={stats?.agents.total || 0}
+                  subtitle={
+                    stats?.agents.total ? (
+                      <span className="flex items-center gap-2">
+                        <span className="flex items-center gap-1">
+                          <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          {stats.agents.byStatus.online}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="size-1.5 rounded-full bg-amber-500" />
+                          {stats.agents.byStatus.busy}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="size-1.5 rounded-full bg-gray-400" />
+                          {stats.agents.byStatus.offline}
+                        </span>
                       </span>
-                      <span className="flex items-center gap-1">
-                        <span className="size-1.5 rounded-full bg-amber-500" />
-                        {stats.agents.byStatus.busy}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="size-1.5 rounded-full bg-gray-400" />
-                        {stats.agents.byStatus.offline}
-                      </span>
-                    </span>
-                  ) : '暂无 Agent'
-                }
-                icon={Bot}
-                iconColor="text-purple-500"
-                sparkData={sparkDataAgents}
-                sparkColor="#8b5cf6"
-                gradientIndex={2}
-              />
-            </motion.div>
+                    ) : '暂无 Agent'
+                  }
+                  icon={Bot}
+                  iconColor="text-purple-500"
+                  sparkData={sparkDataAgents}
+                  sparkColor="#8b5cf6"
+                  gradientIndex={2}
+                />
+              </motion.div>
 
-            <motion.div variants={item}>
-              <AnimatedStatCard
-                title="完成率"
-                value={completionRate}
-                subtitle={
-                  stats?.issues.total ? `共 ${stats.issues.total} 个任务` : '暂无任务'
-                }
-                icon={CheckCircle2}
-                iconColor="text-green-500"
-                sparkData={sparkDataRate}
-                sparkColor="#22c55e"
-                gradientIndex={3}
-                progressRing={completionRate}
-              />
-            </motion.div>
+              <motion.div variants={item}>
+                <AnimatedStatCard
+                  title="完成率"
+                  value={completionRate}
+                  subtitle={
+                    stats?.issues.total ? `共 ${stats.issues.total} 个任务` : '暂无任务'
+                  }
+                  icon={CheckCircle2}
+                  iconColor="text-green-500"
+                  sparkData={sparkDataRate}
+                  sparkColor="#22c55e"
+                  gradientIndex={3}
+                  progressRing={completionRate}
+                />
+              </motion.div>
 
-            <motion.div variants={item}>
-              <AnimatedStatCard
-                title="待处理灵感"
-                value={stats?.inspirations.byStatus.pending || 0}
-                subtitle={
-                  stats?.inspirations.byStatus.analyzing
-                    ? `${stats.inspirations.byStatus.analyzing} 个分析中`
-                    : '等待你的灵感'
-                }
-                icon={Sparkles}
-                iconColor="text-primary"
-                sparkData={sparkDataInsp}
-                sparkColor="#10b981"
-                gradientIndex={4}
-              />
-            </motion.div>
-          </>
-        )}
-      </div>
+              <motion.div variants={item}>
+                <AnimatedStatCard
+                  title="待处理灵感"
+                  value={stats?.inspirations.byStatus.pending || 0}
+                  subtitle={
+                    stats?.inspirations.byStatus.analyzing
+                      ? `${stats.inspirations.byStatus.analyzing} 个分析中`
+                      : '等待你的灵感'
+                  }
+                  icon={Sparkles}
+                  iconColor="text-primary"
+                  sparkData={sparkDataInsp}
+                  sparkColor="#10b981"
+                  gradientIndex={4}
+                />
+              </motion.div>
+            </>
+          )}
+        </motion.div>
+      </AnimatePresence>
 
       {/* Inspiration Pipeline */}
       <motion.div variants={item}>
@@ -813,7 +1007,7 @@ export function DashboardView() {
                       initial={{ opacity: 0, x: -8 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.05 }}
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-all duration-200 hover:translate-x-0.5"
+                      className={`flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-all duration-200 hover:translate-x-0.5 ${agent.agentStatus === 'online' ? 'animate-glow-pulse' : ''}`}
                     >
                       <Avatar className="size-8 ring-1 ring-border/30">
                         <AvatarImage src={agent.avatar || undefined} alt={agent.name} />
@@ -903,7 +1097,8 @@ export function DashboardView() {
                           return (
                             <div
                               key={log.id}
-                              className={`flex items-start gap-3 py-1.5 px-2 rounded-md border-l-2 ${borderColor} hover:bg-muted/30 transition-colors`}
+                              className={`flex items-start gap-3 py-1.5 px-2 rounded-md border-l-2 ${borderColor} hover:bg-muted/30 transition-colors group relative`}
+                              title={new Date(log.createdAt).toLocaleString('zh-CN')}
                             >
                               <div className="flex-1 min-w-0">
                                 <p className="text-xs">
@@ -912,6 +1107,9 @@ export function DashboardView() {
                                 </p>
                                 <p className="text-[10px] text-muted-foreground mt-0.5">
                                   {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true, locale: zhCN })}
+                                  <span className="hidden group-hover:inline text-muted-foreground/60 ml-1">
+                                    ({new Date(log.createdAt).toLocaleString('zh-CN')})
+                                  </span>
                                 </p>
                               </div>
                               <Icon className={`size-3.5 shrink-0 mt-0.5 ${colorClass}`} />
@@ -935,6 +1133,52 @@ export function DashboardView() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Agent Performance Section */}
+      {stats?.agentPerformance && stats.agentPerformance.length > 0 && (
+        <motion.div variants={item}>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <TrendingUp className="size-5 text-primary" />
+                Agent 绩效
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs gap-1"
+                onClick={() => setActiveView('agents')}
+              >
+                详情 <ArrowRight className="size-3" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {stats.agentPerformance.map((ap) => (
+                  <AgentPerformanceRow key={ap.id} performance={ap} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Weekly Activity Heatmap */}
+      {stats?.weeklyActivity && stats.weeklyActivity.length > 0 && (
+        <motion.div variants={item}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Calendar className="size-5 text-primary" />
+                本周活动
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <WeeklyHeatmap data={stats.weeklyActivity} />
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Quick Actions */}
       <motion.div variants={item}>

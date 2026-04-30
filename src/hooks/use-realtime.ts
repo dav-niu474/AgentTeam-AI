@@ -36,8 +36,20 @@ export function useRealtime() {
       console.log('[realtime] Disconnected:', reason)
     })
 
-    socket.on('connect_error', (error) => {
-      console.warn('[realtime] Connection error:', error.message)
+    let errorCount = 0
+    socket.on('connect_error', () => {
+      errorCount++
+      // Only log the first error, then silently retry
+      if (errorCount === 1) {
+        console.info('[realtime] WebSocket not available, real-time updates disabled. Retrying silently...')
+      }
+    })
+
+    socket.on('connect', () => {
+      if (errorCount > 0) {
+        console.info('[realtime] Connected after', errorCount, 'retries')
+      }
+      errorCount = 0
     })
 
     // Map events to query keys that should be invalidated

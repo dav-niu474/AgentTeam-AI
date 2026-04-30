@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Settings, Monitor, Bell, Shield, User, Server, Wifi, WifiOff,
   Plus, Trash2, Edit3, Save, X, Database, Brain, RefreshCw,
   RotateCcw, Key, Lock, Cpu, HardDrive, ToggleLeft, BookOpen,
-  Code2, Heart, Workflow, Eye, MessageSquare,
+  Code2, Heart, Workflow, Eye, MessageSquare, Keyboard, Info,
+  ExternalLink, Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -53,13 +54,34 @@ const MEMORY_CATEGORIES = [
 // ============ Section Configuration ============
 
 const SECTIONS = [
-  { id: 'profile', label: '个人资料', icon: User },
-  { id: 'daemons', label: 'Daemon 管理', icon: Monitor },
-  { id: 'notifications', label: '通知配置', icon: Bell },
-  { id: 'preferences', label: '偏好记忆', icon: Brain },
-  { id: 'security', label: '安全与权限', icon: Shield },
-  { id: 'data', label: '数据管理', icon: Database },
+  { id: 'profile', label: '个人资料', icon: User, description: '管理你的用户信息和头像' },
+  { id: 'daemons', label: 'Daemon 管理', icon: Cpu, description: '配置和监控 Daemon 执行终端' },
+  { id: 'notifications', label: '通知配置', icon: Bell, description: '自定义通知提醒偏好' },
+  { id: 'preferences', label: '偏好记忆', icon: Brain, description: 'Agent 记住的你的工作偏好' },
+  { id: 'security', label: '安全与权限', icon: Shield, description: '权限级别与沙箱安全设置' },
+  { id: 'data', label: '数据管理', icon: Database, description: '重置和管理示例数据' },
 ]
+
+// ============ Checkmark Animation ============
+
+function SaveIndicator({ show }: { show: boolean }) {
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+          className="flex items-center gap-1 text-emerald-500"
+        >
+          <Check className="size-3.5" />
+          <span className="text-xs font-medium">已保存</span>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
 
 // ============ Add Memory Dialog ============
 
@@ -156,7 +178,7 @@ function MemoryEntryCard({
   }
 
   return (
-    <div className="flex items-start gap-3 rounded-md border border-border/50 p-3 hover:border-border transition-colors">
+    <div className="flex items-start gap-3 rounded-md border border-border/50 p-3 hover:border-border hover:bg-muted/20 transition-all duration-200">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">{entry.key}</span>
@@ -194,17 +216,30 @@ function MemoryEntryCard({
 
 // ============ Section Header Component ============
 
-function SectionHeader({ icon: Icon, title, action }: { icon: React.ElementType; title: string; action?: React.ReactNode }) {
+function SectionHeader({ icon: Icon, title, description, action }: { icon: React.ElementType; title: string; description?: string; action?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between">
       <CardTitle className="text-lg flex items-center gap-2.5">
         <div className="flex size-7 items-center justify-center rounded-md bg-primary/10">
           <Icon className="size-3.5 text-primary" />
         </div>
-        {title}
+        <div>
+          <span>{title}</span>
+          {description && (
+            <p className="text-xs font-normal text-muted-foreground mt-0.5">{description}</p>
+          )}
+        </div>
       </CardTitle>
       {action}
     </div>
+  )
+}
+
+// ============ Section Divider ============
+
+function SectionDivider() {
+  return (
+    <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent my-1" />
   )
 }
 
@@ -214,6 +249,7 @@ export function SettingsView() {
   const { user, loading: userLoading, updateUser } = useCurrentUser()
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState('')
+  const [savedKey, setSavedKey] = useState<string | null>(null)
 
   const { data: daemons, isLoading: daemonsLoading } = useDaemons()
   const createDaemon = useCreateDaemon()
@@ -260,11 +296,17 @@ export function SettingsView() {
     return prefs
   }, [notifEntries])
 
+  const showSaveIndicator = (key: string) => {
+    setSavedKey(key)
+    setTimeout(() => setSavedKey(null), 2000)
+  }
+
   const handleSaveName = async () => {
     if (!nameValue.trim()) return
     await updateUser({ name: nameValue.trim() })
     setEditingName(false)
     toast.success('名称已更新')
+    showSaveIndicator('profile-name')
   }
 
   const handleNotifToggle = async (key: string, enabled: boolean) => {
@@ -278,6 +320,8 @@ export function SettingsView() {
         confidence: 1.0,
         source: 'user_preference',
       })
+      toast.success('设置已保存')
+      showSaveIndicator(key)
     } catch (error) {
       toast.error('保存失败')
     }
@@ -294,6 +338,8 @@ export function SettingsView() {
         confidence: 1.0,
         source: 'user_preference',
       })
+      toast.success('设置已保存')
+      showSaveIndicator('auto-approve')
     } catch {
       toast.error('保存失败')
     }
@@ -330,7 +376,7 @@ export function SettingsView() {
   }
 
   return (
-    <div className="space-y-6 p-6 max-w-3xl h-full overflow-y-auto">
+    <div className="space-y-8 p-4 md:p-6 max-w-3xl h-full overflow-y-auto">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -344,7 +390,7 @@ export function SettingsView() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <Card className="overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent">
-            <SectionHeader icon={User} title="个人资料" />
+            <SectionHeader icon={User} title="个人资料" description="管理你的用户信息和头像" />
           </CardHeader>
           <CardContent>
             {userLoading ? (
@@ -361,27 +407,30 @@ export function SettingsView() {
                   {(user.name || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1">
-                  {editingName ? (
-                    <div className="flex items-center gap-2">
-                      <Input
-                        value={nameValue}
-                        onChange={(e) => setNameValue(e.target.value)}
-                        className="h-8 w-48"
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName() }}
-                      />
-                      <Button size="sm" variant="outline" className="h-8 gap-1" onClick={handleSaveName}>
-                        <Save className="size-3" /> 保存
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditingName(false)}>取消</Button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{user.name || '用户'}</h3>
-                      <Button variant="ghost" size="icon" className="size-6 hover:text-primary transition-colors" onClick={() => { setNameValue(user.name || ''); setEditingName(true) }}>
-                        <Edit3 className="size-3" />
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {editingName ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={nameValue}
+                          onChange={(e) => setNameValue(e.target.value)}
+                          className="h-8 w-48"
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName() }}
+                        />
+                        <Button size="sm" variant="outline" className="h-8 gap-1" onClick={handleSaveName}>
+                          <Save className="size-3" /> 保存
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditingName(false)}>取消</Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold">{user.name || '用户'}</h3>
+                        <Button variant="ghost" size="icon" className="size-6 hover:text-primary transition-colors" onClick={() => { setNameValue(user.name || ''); setEditingName(true) }}>
+                          <Edit3 className="size-3" />
+                        </Button>
+                        <SaveIndicator show={savedKey === 'profile-name'} />
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant="outline" className="text-xs rounded-full">{user.role || 'member'}</Badge>
                     <span className="text-xs text-muted-foreground">{user.email || '未设置邮箱'}</span>
@@ -396,13 +445,16 @@ export function SettingsView() {
         </Card>
       </motion.div>
 
+      <SectionDivider />
+
       {/* Daemon Management */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
         <Card className="overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-teal-500/5 to-transparent">
             <SectionHeader
-              icon={Monitor}
+              icon={Cpu}
               title="Daemon 管理"
+              description="配置和监控 Daemon 执行终端"
               action={
                 <Button variant="outline" size="sm" className="gap-1 text-xs hover:-translate-y-0.5 transition-all" onClick={() => setNewDaemonOpen(true)}>
                   <Plus className="size-3" />
@@ -471,11 +523,13 @@ export function SettingsView() {
         </Card>
       </motion.div>
 
+      <SectionDivider />
+
       {/* Notification Preferences */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
         <Card className="overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-amber-500/5 to-transparent">
-            <SectionHeader icon={Bell} title="通知配置" />
+            <SectionHeader icon={Bell} title="通知配置" description="自定义通知提醒偏好" />
           </CardHeader>
           <CardContent>
             <div className="space-y-5">
@@ -486,13 +540,17 @@ export function SettingsView() {
                       <ItemIcon className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium">{label}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{label}</p>
+                        <SaveIndicator show={savedKey === key} />
+                      </div>
                       <p className="text-xs text-muted-foreground">{description}</p>
                     </div>
                   </div>
                   <Switch
                     checked={notifPrefs[key]}
                     onCheckedChange={(checked) => handleNotifToggle(key, checked)}
+                    className="scale-90"
                   />
                 </div>
               ))}
@@ -501,6 +559,8 @@ export function SettingsView() {
         </Card>
       </motion.div>
 
+      <SectionDivider />
+
       {/* Memory/Preferences Section */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
         <Card className="overflow-hidden">
@@ -508,6 +568,7 @@ export function SettingsView() {
             <SectionHeader
               icon={Brain}
               title="偏好记忆"
+              description="Agent 记住的你的工作偏好"
               action={
                 <Button variant="outline" size="sm" className="gap-1 text-xs hover:-translate-y-0.5 transition-all" onClick={() => setAddMemOpen(true)}>
                   <Plus className="size-3" />
@@ -563,11 +624,13 @@ export function SettingsView() {
         </Card>
       </motion.div>
 
+      <SectionDivider />
+
       {/* Security Section */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
         <Card className="overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-rose-500/5 to-transparent">
-            <SectionHeader icon={Shield} title="安全与权限" />
+            <SectionHeader icon={Shield} title="安全与权限" description="权限级别与沙箱安全设置" />
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Working directory isolation */}
@@ -585,7 +648,7 @@ export function SettingsView() {
                   animate={{ opacity: [1, 0.5, 1] }}
                   transition={{ duration: 2, repeat: Infinity }}
                 />
-                <span className="text-xs text-emerald-600">沙箱隔离已启用</span>
+                <span className="text-xs text-emerald-600 dark:text-emerald-400">沙箱隔离已启用</span>
               </div>
             </div>
 
@@ -599,15 +662,15 @@ export function SettingsView() {
               </h4>
               <div className="space-y-2">
                 <div className="flex items-center gap-3 rounded-md border border-border/50 p-2.5 hover:border-emerald-500/30 transition-colors">
-                  <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/20 rounded-full">读取</Badge>
+                  <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 rounded-full">读取</Badge>
                   <span className="text-xs text-muted-foreground">查看代码和文件</span>
                 </div>
                 <div className="flex items-center gap-3 rounded-md border border-border/50 p-2.5 hover:border-amber-500/30 transition-colors">
-                  <Badge className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/20 rounded-full">写入</Badge>
+                  <Badge className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 rounded-full">写入</Badge>
                   <span className="text-xs text-muted-foreground">修改指定工作目录中的文件</span>
                 </div>
                 <div className="flex items-center gap-3 rounded-md border border-border/50 p-2.5 hover:border-red-500/30 transition-colors">
-                  <Badge className="text-[10px] bg-red-500/10 text-red-600 border-red-500/20 rounded-full">执行</Badge>
+                  <Badge className="text-[10px] bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 rounded-full">执行</Badge>
                   <span className="text-xs text-muted-foreground">运行CLI命令（受工具白名单限制）</span>
                 </div>
               </div>
@@ -622,7 +685,10 @@ export function SettingsView() {
                   <ToggleLeft className="size-3.5 text-muted-foreground" />
                   自动审批阈值
                 </h4>
-                <span className="text-sm font-semibold text-primary">{autoApproveThreshold.toFixed(1)}</span>
+                <div className="flex items-center gap-2">
+                  <SaveIndicator show={savedKey === 'auto-approve'} />
+                  <span className="text-sm font-semibold text-primary">{autoApproveThreshold.toFixed(1)}</span>
+                </div>
               </div>
               <p className="text-xs text-muted-foreground mb-3">
                 Agent操作置信度超过此阈值时自动执行，低于阈值需人工确认
@@ -644,11 +710,13 @@ export function SettingsView() {
         </Card>
       </motion.div>
 
+      <SectionDivider />
+
       {/* Data Management Section */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
         <Card className="overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-cyan-500/5 to-transparent">
-            <SectionHeader icon={Database} title="数据管理" />
+            <SectionHeader icon={Database} title="数据管理" description="重置和管理示例数据" />
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
@@ -681,6 +749,79 @@ export function SettingsView() {
                 <RotateCcw className={`size-3.5 ${resetting ? 'animate-spin' : ''}`} />
                 {resetting ? '重置中...' : '重置示例数据'}
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <SectionDivider />
+
+      {/* Keyboard Shortcuts Section */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+        <Card className="overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-indigo-500/5 to-transparent">
+            <SectionHeader icon={Keyboard} title="键盘快捷键" description="快速操作键位绑定" />
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+              {[
+                { keys: '⌘ K', description: '打开命令面板' },
+                { keys: '⌘ I', description: '表达想法' },
+                { keys: '⌘ /', description: '切换侧栏' },
+              ].map((shortcut) => (
+                <div key={shortcut.keys} className="flex items-center justify-between rounded-md border border-border/50 p-3 hover:border-border transition-colors">
+                  <span className="text-sm">{shortcut.description}</span>
+                  <kbd className="pointer-events-none inline-flex h-6 items-center gap-1 rounded border border-border/60 bg-muted/80 px-2 font-mono text-[11px] font-medium text-muted-foreground">
+                    {shortcut.keys}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <SectionDivider />
+
+      {/* About Section */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+        <Card className="overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-gray-500/5 to-transparent">
+            <SectionHeader icon={Info} title="关于" description="平台版本与信息" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">版本</span>
+                <Badge variant="outline" className="text-xs">v0.1.0 MVP</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">框架</span>
+                <span className="text-sm font-medium">Next.js 16 + TypeScript</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">UI 组件</span>
+                <span className="text-sm font-medium">shadcn/ui + Tailwind CSS</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">数据库</span>
+                <span className="text-sm font-medium">Prisma + SQLite</span>
+              </div>
+              <Separator />
+              <div className="flex items-center gap-3">
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+                  <a href="https://github.com" target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="size-3" />
+                    GitHub
+                  </a>
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+                  <a href="https://github.com" target="_blank" rel="noopener noreferrer">
+                    <BookOpen className="size-3" />
+                    文档
+                  </a>
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

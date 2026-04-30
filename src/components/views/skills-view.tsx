@@ -32,6 +32,14 @@ import { toast } from 'sonner'
 
 // ============ Constants ============
 
+const SCENE_BORDER_COLORS: Record<string, string> = {
+  'code-gen': 'border-l-emerald-500',
+  review: 'border-l-violet-500',
+  doc: 'border-l-amber-500',
+  analysis: 'border-l-rose-500',
+  custom: 'border-l-gray-400',
+}
+
 const SCENE_OPTIONS = [
   { value: 'code-gen', label: '代码生成', icon: Code2, color: 'bg-emerald-500/10 text-emerald-600' },
   { value: 'review', label: '代码审查', icon: Search, color: 'bg-blue-500/10 text-blue-600' },
@@ -540,6 +548,7 @@ export function SkillsView() {
               const sceneOption = SCENE_OPTIONS.find(s => s.value === skill.scene)
               const boundAgents = skill._count?.agentSkills ?? skill.agentSkills?.length ?? 0
               const colorClass = getSkillColor(skill.name)
+              const borderColor = SCENE_BORDER_COLORS[skill.scene || ''] || 'border-l-gray-300'
 
               return (
                 <motion.div
@@ -549,7 +558,7 @@ export function SkillsView() {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ delay: i * 0.05 }}
                 >
-                  <Card className="group hover:shadow-md transition-shadow">
+                  <Card className={`group hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 border-l-[3px] ${borderColor} card-hover-gradient`}>
                     <CardContent className="p-6">
                       <div className="flex items-start gap-3">
                         {/* Icon */}
@@ -562,7 +571,7 @@ export function SkillsView() {
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold text-sm truncate">{skill.name}</h3>
                             {skill.isBuiltIn && (
-                              <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-primary/10 text-primary">
+                              <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-primary/15 text-primary font-semibold border border-primary/20">
                                 内置
                               </Badge>
                             )}
@@ -576,8 +585,8 @@ export function SkillsView() {
                                 {sceneOption.label}
                               </Badge>
                             )}
-                            <span className="text-[10px] text-muted-foreground">v{skill.version}</span>
-                            <span className="text-[10px] text-muted-foreground">· 使用 {skill.usageCount} 次</span>
+                            <span className="text-[10px] text-muted-foreground font-medium">v{skill.version}</span>
+                            <span className="text-[10px] text-muted-foreground font-semibold tabular-nums">· {skill.usageCount} 次</span>
                             {boundAgents > 0 && (
                               <span className="text-[10px] text-muted-foreground">· {boundAgents} Agent</span>
                             )}

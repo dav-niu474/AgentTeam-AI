@@ -22,6 +22,7 @@ import {
   User,
   Lightbulb,
   Terminal,
+  Keyboard,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -50,6 +51,7 @@ import { SessionsView } from '@/components/views/sessions-view'
 import { InspirationQuickInput } from '@/components/inspiration-quick-input'
 import { CommandPalette } from '@/components/command-palette'
 import { NotificationPanel } from '@/components/notification-panel'
+import { KeyboardShortcutsHelp, useKeyboardShortcuts } from '@/components/keyboard-shortcuts'
 import { useRealtime } from '@/hooks/use-realtime'
 
 const navItems: { id: ActiveView; label: string; icon: React.ElementType }[] = [
@@ -106,7 +108,7 @@ function ThemeToggle() {
   )
 }
 
-function HeaderBar({ onMobileMenuToggle, onCommandPaletteToggle }: { onMobileMenuToggle: () => void; onCommandPaletteToggle: () => void }) {
+function HeaderBar({ onMobileMenuToggle, onCommandPaletteToggle, onShortcutsToggle }: { onMobileMenuToggle: () => void; onCommandPaletteToggle: () => void; onShortcutsToggle: () => void }) {
   const { setShowInspirationInput } = useAppStore()
 
   return (
@@ -141,10 +143,10 @@ function HeaderBar({ onMobileMenuToggle, onCommandPaletteToggle }: { onMobileMen
           className="relative cursor-pointer group"
           onClick={onCommandPaletteToggle}
         >
-          <div className="flex items-center h-8 w-full rounded-md border border-border/50 bg-muted/50 px-3 text-muted-foreground text-sm hover:bg-muted/80 hover:border-border transition-all duration-200 group-hover:shadow-sm">
-            <Search className="size-3.5 mr-2 shrink-0 group-hover:text-primary/60 transition-colors" />
-            <span className="flex-1">搜索...</span>
-            <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-border/50 bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground group-hover:border-primary/30 transition-colors">
+          <div className="flex items-center h-9 w-full rounded-lg border border-border/60 bg-background px-3 text-muted-foreground text-sm hover:border-primary/40 hover:shadow-sm focus-within:border-primary/50 focus-within:shadow-sm focus-within:ring-1 focus-within:ring-primary/20 transition-all duration-200">
+            <Search className="size-3.5 mr-2 shrink-0 text-muted-foreground/60 group-hover:text-primary/70 transition-colors" />
+            <span className="flex-1">搜索任务、Agent、技能...</span>
+            <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-border/50 bg-muted/80 px-1.5 font-mono text-[10px] font-medium text-muted-foreground group-hover:border-primary/30 group-hover:text-primary/60 transition-colors">
               <Command className="size-2.5" />K
             </kbd>
           </div>
@@ -171,7 +173,25 @@ function HeaderBar({ onMobileMenuToggle, onCommandPaletteToggle }: { onMobileMen
           </TooltipContent>
         </Tooltip>
 
-        <NotificationPanel />
+        <div className="animate-bounce-subtle">
+          <NotificationPanel />
+        </div>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 hover:bg-accent/80 transition-colors"
+              onClick={onShortcutsToggle}
+            >
+              <Keyboard className="size-4 text-muted-foreground" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>快捷键 (?)</p>
+          </TooltipContent>
+        </Tooltip>
 
         <ThemeToggle />
 
@@ -186,7 +206,7 @@ function HeaderBar({ onMobileMenuToggle, onCommandPaletteToggle }: { onMobileMen
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-48 animate-fade-slide-in">
             <DropdownMenuLabel>我的账户</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2">
@@ -237,8 +257,8 @@ function SidebarNav({
                     transition-all duration-200 relative
                     ${
                       isActive
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground hover:translate-x-0.5'
+                        ? 'bg-primary/10 text-primary scale-[1.02]'
+                        : 'text-muted-foreground hover:bg-muted/50 hover:text-accent-foreground hover:scale-[1.02]'
                     }
                     ${collapsed ? 'justify-center px-2' : ''}
                   `}
@@ -285,7 +305,7 @@ function SidebarNav({
           <motion.span
             className={`size-2 rounded-full shrink-0 ${
               daemonOnline
-                ? 'bg-emerald-500 pulse-glow'
+                ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]'
                 : 'bg-red-500'
             }`}
             animate={daemonOnline ? { scale: [1, 1.2, 1] } : {}}
@@ -316,21 +336,21 @@ function FooterBar() {
   const { daemonOnline } = useAppStore()
 
   return (
-    <footer className="h-8 bg-background/80 glass-effect flex items-center justify-between px-4 text-xs text-muted-foreground z-30">
+    <footer className="h-8 bg-background/80 glass-effect flex items-center justify-between px-4 text-xs text-muted-foreground z-30 border-t border-border/30">
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <motion.span
-            className={`size-1.5 rounded-full ${
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`size-2 rounded-full ${
               daemonOnline
-                ? 'bg-emerald-500'
+                ? 'bg-emerald-500 animate-pulse-soft shadow-[0_0_6px_rgba(16,185,129,0.5)]'
                 : 'bg-red-500'
             }`}
-            animate={daemonOnline ? { opacity: [1, 0.5, 1] } : {}}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
           />
-          <span>Daemon: {daemonOnline ? 'Online' : 'Offline'}</span>
+          <span className={daemonOnline ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-red-500 font-medium'}>
+            Daemon {daemonOnline ? 'Online' : 'Offline'}
+          </span>
         </div>
-        <span className="text-border">|</span>
+        <span className="text-border/50">|</span>
         <span className="hidden sm:inline">系统运行中</span>
       </div>
       <div className="flex items-center gap-2">
@@ -382,19 +402,17 @@ export function AppShell() {
   useRealtime()
 
   // Keyboard shortcuts
+  const { setActiveView } = useAppStore()
+  const { helpOpen, setHelpOpen } = useKeyboardShortcuts(
+    setActiveView,
+    () => setCommandPaletteOpen((prev) => !prev),
+    () => useAppStore.getState().setShowInspirationInput(true),
+  )
+
+  // Legacy keyboard shortcuts for Cmd+I and Cmd+K (handled by useKeyboardShortcuts now)
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'i') {
-        e.preventDefault()
-        useAppStore.getState().setShowInspirationInput(true)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault()
-        setCommandPaletteOpen((prev) => !prev)
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    // These are handled by useKeyboardShortcuts hook
+    // keeping this for any additional shortcuts not covered
   }, [])
 
   return (
@@ -403,6 +421,7 @@ export function AppShell() {
       <HeaderBar
         onMobileMenuToggle={() => setMobileMenuOpen(true)}
         onCommandPaletteToggle={() => setCommandPaletteOpen((prev) => !prev)}
+        onShortcutsToggle={() => setHelpOpen((prev) => !prev)}
       />
 
       {/* Main area: Sidebar + Content */}
@@ -470,6 +489,9 @@ export function AppShell() {
 
       {/* Command Palette */}
       <CommandPalette />
+
+      {/* Shortcuts Help Dialog */}
+      <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   )
 }

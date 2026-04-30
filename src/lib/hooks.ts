@@ -41,6 +41,7 @@ import {
   type UpdateMemoryData,
   type AutoAssignResult,
   type ScanResult,
+  type AgentStatsResult,
 } from '@/lib/api'
 
 // ============ Query Key Factory ============
@@ -62,6 +63,7 @@ export const queryKeys = {
   daemon: (id: string) => ['daemons', id] as const,
   auditLogs: (params?: AuditLogsParams) => ['auditLogs', params] as const,
   memory: (params: MemoryParams) => ['memory', params] as const,
+  agentStats: (id: string) => ['agentStats', id] as const,
 }
 
 // ============ Stats Hooks ============
@@ -465,6 +467,40 @@ export function useAgentScan() {
       queryClient.invalidateQueries({ queryKey: queryKeys.stats })
       queryClient.invalidateQueries({ queryKey: ['auditLogs'] })
     },
+  })
+}
+
+// ============ Agent Stats Hooks ============
+
+export function useAgentStats(id: string) {
+  return useQuery({
+    queryKey: queryKeys.agentStats(id),
+    queryFn: async () => {
+      const res = await fetch(`/api/agents/${id}/stats`)
+      if (!res.ok) throw new Error('Failed to get agent stats')
+      return res.json() as Promise<AgentStatsResult>
+    },
+    enabled: !!id,
+  })
+}
+
+export function useCreateSubtask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ parentId, data }: { parentId: string; data: Omit<import('@/lib/api').CreateIssueData, 'parentIssueId'> }) =>
+      issuesApi.createSubtask(parentId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['issues'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats })
+    },
+  })
+}
+
+export function useSubtasks(issueId: string) {
+  return useQuery({
+    queryKey: ['subtasks', issueId],
+    queryFn: () => issuesApi.subtasks(issueId),
+    enabled: !!issueId,
   })
 }
 
