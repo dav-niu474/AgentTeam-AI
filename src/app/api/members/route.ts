@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
 
     // Broadcast real-time event
     if (type === 'agent') {
-      await broadcastEvent('agent:status', { memberId: member.id, name, status: agentStatus || 'offline' });
+      broadcastEvent('agent:status', { memberId: member.id, name, status: agentStatus || 'offline' });
     }
 
     return NextResponse.json(member, { status: 201 });

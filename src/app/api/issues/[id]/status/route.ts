@@ -97,7 +97,7 @@ export async function PATCH(
     });
 
     // Broadcast real-time event
-    await broadcastEvent('issue:status', { issueId: id, from: currentStatus, to: newStatus, actorId: logActorId });
+    broadcastEvent('issue:status', { issueId: id, from: currentStatus, to: newStatus, actorId: logActorId });
 
     return NextResponse.json(updatedIssue);
   } catch (error) {

@@ -20,6 +20,7 @@ import {
   Command,
   LogOut,
   User,
+  Lightbulb,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,16 +40,19 @@ import { Badge } from '@/components/ui/badge'
 import { useAppStore, type ActiveView } from '@/lib/store'
 import { DashboardView } from '@/components/views/dashboard-view'
 import { BoardView } from '@/components/views/board-view'
+import { InspirationsView } from '@/components/views/inspirations-view'
 import { AgentsView } from '@/components/views/agents-view'
 import { MonitorView } from '@/components/views/monitor-view'
 import { SkillsView } from '@/components/views/skills-view'
 import { SettingsView } from '@/components/views/settings-view'
 import { InspirationQuickInput } from '@/components/inspiration-quick-input'
+import { CommandPalette } from '@/components/command-palette'
 import { useRealtime } from '@/hooks/use-realtime'
 
 const navItems: { id: ActiveView; label: string; icon: React.ElementType }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'board', label: 'Board', icon: Kanban },
+  { id: 'inspirations', label: 'Inspirations', icon: Lightbulb },
   { id: 'agents', label: 'Agents', icon: Bot },
   { id: 'monitor', label: 'Monitor', icon: Activity },
   { id: 'skills', label: 'Skills', icon: Zap },
@@ -92,7 +96,7 @@ function ThemeToggle() {
   )
 }
 
-function HeaderBar({ onMobileMenuToggle }: { onMobileMenuToggle: () => void }) {
+function HeaderBar({ onMobileMenuToggle, onCommandPaletteToggle }: { onMobileMenuToggle: () => void; onCommandPaletteToggle: () => void }) {
   const { setShowInspirationInput } = useAppStore()
 
   return (
@@ -117,11 +121,11 @@ function HeaderBar({ onMobileMenuToggle }: { onMobileMenuToggle: () => void }) {
         </div>
       </div>
 
-      {/* Center: Search */}
+      {/* Center: Search / Command Palette trigger */}
       <div className="flex-1 max-w-md mx-auto">
         <div
           className="relative cursor-pointer"
-          onClick={() => {/* Future: open command palette */}}
+          onClick={onCommandPaletteToggle}
         >
           <div className="flex items-center h-8 w-full rounded-md border border-border/50 bg-muted/50 px-3 text-muted-foreground text-sm hover:bg-muted transition-colors">
             <Search className="size-3.5 mr-2 shrink-0" />
@@ -214,27 +218,27 @@ function SidebarNav({
     <div className="flex flex-col h-full">
       {/* Navigation Items */}
       <nav className="flex-1 px-2 py-3 space-y-0.5">
-        {navItems.map((item) => {
-          const isActive = activeView === item.id
-          const Icon = item.icon
+        {navItems.map((navItem) => {
+          const isActive = activeView === navItem.id
+          const Icon = navItem.icon
           return (
-            <Tooltip key={item.id} delayDuration={collapsed ? 0 : 300}>
+            <Tooltip key={navItem.id} delayDuration={collapsed ? 0 : 300}>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => handleNavClick(item.id)}
+                  onClick={() => handleNavClick(navItem.id)}
                   className={`
                     w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium
-                    transition-all duration-150
+                    transition-all duration-150 relative
                     ${
                       isActive
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                        ? 'bg-primary/10 text-primary border-l-2 border-l-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground border-l-2 border-l-transparent'
                     }
                     ${collapsed ? 'justify-center px-2' : ''}
                   `}
                 >
                   <Icon className={`size-4 shrink-0 ${isActive ? 'text-primary' : ''}`} />
-                  {!collapsed && <span>{item.label}</span>}
+                  {!collapsed && <span>{navItem.label}</span>}
                   {isActive && !collapsed && (
                     <motion.div
                       layoutId="sidebar-active"
@@ -246,7 +250,7 @@ function SidebarNav({
               </TooltipTrigger>
               {collapsed && (
                 <TooltipContent side="right">
-                  <p>{item.label}</p>
+                  <p>{navItem.label}</p>
                 </TooltipContent>
               )}
             </Tooltip>
@@ -319,6 +323,7 @@ function ViewRenderer() {
   const views: Record<ActiveView, React.ReactNode> = {
     dashboard: <DashboardView />,
     board: <BoardView />,
+    inspirations: <InspirationsView />,
     agents: <AgentsView />,
     monitor: <MonitorView />,
     skills: <SkillsView />,
@@ -329,10 +334,10 @@ function ViewRenderer() {
     <AnimatePresence mode="wait">
       <motion.div
         key={activeView}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8 }}
-        transition={{ duration: 0.15 }}
+        initial={{ opacity: 0, scale: 0.98, y: 6 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.98, y: -6 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
         className="h-full overflow-auto"
       >
         {views[activeView]}
@@ -344,16 +349,21 @@ function ViewRenderer() {
 export function AppShell() {
   const { sidebarCollapsed, toggleSidebar } = useAppStore()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
   // Enable real-time WebSocket updates for the entire app
   useRealtime()
 
-  // Keyboard shortcut for inspiration input
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'i') {
         e.preventDefault()
         useAppStore.getState().setShowInspirationInput(true)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCommandPaletteOpen((prev) => !prev)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -363,7 +373,10 @@ export function AppShell() {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Header */}
-      <HeaderBar onMobileMenuToggle={() => setMobileMenuOpen(true)} />
+      <HeaderBar
+        onMobileMenuToggle={() => setMobileMenuOpen(true)}
+        onCommandPaletteToggle={() => setCommandPaletteOpen((prev) => !prev)}
+      />
 
       {/* Main area: Sidebar + Content */}
       <div className="flex-1 flex overflow-hidden">
@@ -427,6 +440,9 @@ export function AppShell() {
 
       {/* Inspiration Quick Input Dialog */}
       <InspirationQuickInput />
+
+      {/* Command Palette */}
+      <CommandPalette />
     </div>
   )
 }

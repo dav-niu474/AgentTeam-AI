@@ -67,6 +67,7 @@ export function useStats() {
   return useQuery({
     queryKey: queryKeys.stats,
     queryFn: () => statsApi.get(),
+    refetchOnMount: 'always',
   })
 }
 
@@ -76,6 +77,7 @@ export function useMembers(params?: MembersParams) {
   return useQuery({
     queryKey: queryKeys.members(params),
     queryFn: () => membersApi.list(params),
+    refetchOnMount: 'always',
   })
 }
 
@@ -136,6 +138,7 @@ export function useIssues(params?: IssuesParams) {
   return useQuery({
     queryKey: queryKeys.issues(params),
     queryFn: () => issuesApi.list(params),
+    refetchOnMount: 'always',
   })
 }
 

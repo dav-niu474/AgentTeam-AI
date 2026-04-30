@@ -36,6 +36,14 @@ import {
   GripVertical,
   Loader2,
   MessageSquare,
+  Trash2,
+  ArrowRight,
+  Zap,
+  Code,
+  FileText,
+  BarChart3,
+  Eye,
+  Play,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -79,11 +87,13 @@ import {
   useUpdateIssueStatus,
   useUpdateIssue,
   useCreateComment,
+  useDeleteIssue,
 } from '@/lib/hooks'
 import { useCurrentUser } from '@/lib/use-current-user'
 import { useAppStore } from '@/lib/store'
 import { parseJsonField } from '@/lib/api'
 import type { Issue, Member } from '@/lib/api'
+import { toast } from 'sonner'
 
 // ==========================================
 // Constants
@@ -108,17 +118,17 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 }
 
 const COLUMN_CONFIG = [
-  { id: 'open', label: '待处理', color: 'bg-slate-400', accent: 'border-t-slate-400' },
-  { id: 'in_progress', label: '进行中', color: 'bg-emerald-500', accent: 'border-t-emerald-500' },
-  { id: 'in_review', label: '待审查', color: 'bg-amber-500', accent: 'border-t-amber-500' },
-  { id: 'resolved', label: '已解决', color: 'bg-green-500', accent: 'border-t-green-500' },
+  { id: 'open', label: '待处理', color: 'bg-slate-400', accent: 'border-t-slate-400', wipLimit: 10 },
+  { id: 'in_progress', label: '进行中', color: 'bg-emerald-500', accent: 'border-t-emerald-500', wipLimit: 5 },
+  { id: 'in_review', label: '待审查', color: 'bg-amber-500', accent: 'border-t-amber-500', wipLimit: 5 },
+  { id: 'resolved', label: '已解决', color: 'bg-green-500', accent: 'border-t-green-500', wipLimit: 20 },
 ]
 
-const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  urgent: { label: '紧急', color: 'text-red-600', bg: 'bg-red-500/10 border-red-500/30' },
-  high: { label: '高', color: 'text-orange-600', bg: 'bg-orange-500/10 border-orange-500/30' },
-  medium: { label: '中', color: 'text-blue-600', bg: 'bg-blue-500/10 border-blue-500/30' },
-  low: { label: '低', color: 'text-gray-500', bg: 'bg-gray-500/10 border-gray-500/30' },
+const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon?: React.ElementType }> = {
+  urgent: { label: '紧急', color: 'text-red-600', bg: 'bg-red-500/10 border-red-500/30', border: 'border-l-red-500' },
+  high: { label: '高', color: 'text-orange-600', bg: 'bg-orange-500/10 border-orange-500/30', border: 'border-l-orange-500' },
+  medium: { label: '中', color: 'text-blue-600', bg: 'bg-blue-500/10 border-blue-500/30', border: 'border-l-blue-500' },
+  low: { label: '低', color: 'text-gray-500', bg: 'bg-gray-500/10 border-gray-500/30', border: 'border-l-gray-400' },
 }
 
 const SCENE_LABELS: Record<string, string> = {
@@ -129,11 +139,19 @@ const SCENE_LABELS: Record<string, string> = {
   custom: '自定义',
 }
 
+const SCENE_ICONS: Record<string, React.ElementType> = {
+  'code-gen': Code,
+  doc: FileText,
+  analysis: BarChart3,
+  review: Eye,
+  custom: Zap,
+}
+
 // ==========================================
 // Issue Card Component
 // ==========================================
 
-function IssueCard({ issue, onClick }: { issue: Issue; onClick: () => void }) {
+function IssueCard({ issue, onClick, onQuickAction }: { issue: Issue; onClick: () => void; onQuickAction: (action: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: issue.id,
     data: { status: issue.status },
@@ -147,11 +165,13 @@ function IssueCard({ issue, onClick }: { issue: Issue; onClick: () => void }) {
 
   const priority = PRIORITY_CONFIG[issue.priority] || PRIORITY_CONFIG.medium
   const labels = parseJsonField<string[]>(issue.labels, [])
+  const SceneIcon = (issue.scene && SCENE_ICONS[issue.scene]) || null
+  const commentCount = issue._count?.comments || 0
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
       <Card
-        className={`cursor-pointer hover:shadow-md transition-all duration-150 border-t-2 ${COLUMN_CONFIG.find(c => c.id === issue.status)?.accent || ''} ${isDragging ? 'shadow-lg' : ''}`}
+        className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 border-t-2 border-l-[3px] ${priority.border} ${COLUMN_CONFIG.find(c => c.id === issue.status)?.accent || ''} ${isDragging ? 'shadow-lg ring-2 ring-primary/20' : ''} group relative`}
         onClick={onClick}
       >
         <CardContent className="p-3 space-y-2">
@@ -160,6 +180,7 @@ function IssueCard({ issue, onClick }: { issue: Issue; onClick: () => void }) {
             <button {...listeners} className="mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground">
               <GripVertical className="size-3.5" />
             </button>
+            {SceneIcon && <SceneIcon className="size-3.5 mt-0.5 text-muted-foreground/60 shrink-0" />}
             <h3 className="text-sm font-medium leading-snug line-clamp-2 flex-1">{issue.title}</h3>
           </div>
 
@@ -200,11 +221,46 @@ function IssueCard({ issue, onClick }: { issue: Issue; onClick: () => void }) {
               </span>
             </div>
             <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+              {commentCount > 0 && (
+                <span className="flex items-center gap-0.5">
+                  <MessageSquare className="size-3" />
+                  {commentCount}
+                </span>
+              )}
               <span className="flex items-center gap-0.5">
                 <Clock className="size-3" />
                 {formatDistanceToNow(new Date(issue.createdAt), { addSuffix: false, locale: zhCN })}
               </span>
             </div>
+          </div>
+
+          {/* Quick Actions on Hover */}
+          <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+            {issue.status === 'open' && (
+              <button
+                className="size-6 rounded-md bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 flex items-center justify-center transition-colors"
+                onClick={(e) => { e.stopPropagation(); onQuickAction('start') }}
+                title="开始处理"
+              >
+                <Play className="size-3" />
+              </button>
+            )}
+            {issue.assigneeId && issue.status === 'in_progress' && (
+              <button
+                className="size-6 rounded-md bg-primary/10 text-primary hover:bg-primary/20 flex items-center justify-center transition-colors"
+                onClick={(e) => { e.stopPropagation(); onQuickAction('execute') }}
+                title="执行任务"
+              >
+                <Zap className="size-3" />
+              </button>
+            )}
+            <button
+              className="size-6 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 flex items-center justify-center transition-colors"
+              onClick={(e) => { e.stopPropagation(); onQuickAction('delete') }}
+              title="删除"
+            >
+              <Trash2 className="size-3" />
+            </button>
           </div>
         </CardContent>
       </Card>
@@ -220,25 +276,42 @@ function KanbanColumn({
   config,
   issues,
   onIssueClick,
+  onQuickAction,
 }: {
   config: typeof COLUMN_CONFIG[number]
   issues: Issue[]
   onIssueClick: (issue: Issue) => void
+  onQuickAction: (issue: Issue, action: string) => void
 }) {
+  const isOverWip = issues.length > config.wipLimit
+
   return (
     <div className="flex flex-col rounded-lg border border-border/50 bg-muted/20 min-w-[280px] md:min-w-0">
       <div className={`flex items-center gap-2 p-3 border-b border-border/50 border-t-2 ${config.accent}`}>
         <span className={`size-2.5 rounded-full ${config.color}`} />
         <span className="text-sm font-medium">{config.label}</span>
-        <Badge variant="secondary" className="text-[10px] ml-auto h-5 min-w-[20px] justify-center">
+        <Badge
+          variant={isOverWip ? 'destructive' : 'secondary'}
+          className={`text-[10px] ml-auto h-5 min-w-[20px] justify-center ${isOverWip ? 'animate-pulse' : ''}`}
+        >
           {issues.length}
         </Badge>
+        {config.wipLimit < 20 && (
+          <span className="text-[10px] text-muted-foreground">
+            /{config.wipLimit}
+          </span>
+        )}
       </div>
       <SortableContext items={issues.map(i => i.id)} strategy={verticalListSortingStrategy}>
         <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-240px)]">
           {issues.length > 0 ? (
             issues.map((issue) => (
-              <IssueCard key={issue.id} issue={issue} onClick={() => onIssueClick(issue)} />
+              <IssueCard
+                key={issue.id}
+                issue={issue}
+                onClick={() => onIssueClick(issue)}
+                onQuickAction={(action) => onQuickAction(issue, action)}
+              />
             ))
           ) : (
             <div className="flex items-center justify-center py-8 text-muted-foreground/50">
@@ -423,6 +496,7 @@ function IssueDetailSheet({
   userId: string | null
 }) {
   const [commentText, setCommentText] = useState('')
+  const [executing, setExecuting] = useState(false)
   const changeStatusMutation = useUpdateIssueStatus()
   const updateIssueMutation = useUpdateIssue()
   const createCommentMutation = useCreateComment()
@@ -434,6 +508,7 @@ function IssueDetailSheet({
   const labels = parseJsonField<string[]>(issue.labels, [])
   const validTransitions = VALID_TRANSITIONS[issue.status] || []
   const comments = commentsData || []
+  const commentCount = issue._count?.comments || comments.length
 
   const handleStatusChange = (newStatus: string) => {
     changeStatusMutation.mutate(
@@ -464,6 +539,33 @@ function IssueDetailSheet({
     )
   }
 
+  const handleExecuteTask = async () => {
+    if (!issue.assigneeId) {
+      toast.error('请先指派一个 Agent')
+      return
+    }
+    setExecuting(true)
+    try {
+      const res = await fetch('/api/execute?XTransformPort=3003', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          issueId: issue.id,
+          agentId: issue.assigneeId,
+          taskDescription: issue.description || issue.title,
+        }),
+      })
+      if (!res.ok) {
+        throw new Error('执行请求失败')
+      }
+      toast.success('任务已提交执行')
+    } catch {
+      toast.error('执行请求失败，请检查 Daemon 是否在线')
+    } finally {
+      setExecuting(false)
+    }
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
@@ -486,6 +588,22 @@ function IssueDetailSheet({
         </SheetHeader>
 
         <Separator className="mb-4" />
+
+        {/* Execute Task Button */}
+        {issue.assigneeId && (issue.status === 'in_progress' || issue.status === 'open' || issue.status === 'triaged') && (
+          <Button
+            className="w-full gap-2 mb-4 py-5 text-base"
+            onClick={handleExecuteTask}
+            disabled={executing}
+          >
+            {executing ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : (
+              <span>🚀</span>
+            )}
+            {executing ? '执行中...' : '执行任务'}
+          </Button>
+        )}
 
         {/* Description */}
         <div className="mb-6">
@@ -539,7 +657,7 @@ function IssueDetailSheet({
                   key={s}
                   variant="outline"
                   size="sm"
-                  className="text-xs gap-1"
+                  className="text-xs gap-1 hover:-translate-y-0.5 transition-all"
                   onClick={() => handleStatusChange(s)}
                   disabled={changeStatusMutation.isPending}
                 >
@@ -558,8 +676,8 @@ function IssueDetailSheet({
           <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
             <MessageSquare className="size-4" />
             评论
-            {comments.length > 0 && (
-              <Badge variant="secondary" className="text-[10px]">{comments.length}</Badge>
+            {commentCount > 0 && (
+              <Badge variant="secondary" className="text-[10px]">{commentCount}</Badge>
             )}
           </h4>
 
@@ -637,6 +755,36 @@ function IssueDetailSheet({
 }
 
 // ==========================================
+// Drag Overlay Card
+// ==========================================
+
+function DragOverlayCard({ issue }: { issue: Issue }) {
+  const priority = PRIORITY_CONFIG[issue.priority] || PRIORITY_CONFIG.medium
+  const SceneIcon = (issue.scene && SCENE_ICONS[issue.scene]) || null
+
+  return (
+    <Card className="shadow-2xl border-t-2 border-l-[3px] max-w-[320px] ring-2 ring-primary/20 bg-background/95 backdrop-blur-sm rotate-2">
+      <CardContent className="p-3 space-y-2">
+        <div className="flex items-start gap-1.5">
+          {SceneIcon && <SceneIcon className="size-3.5 mt-0.5 text-muted-foreground/60 shrink-0" />}
+          <h3 className="text-sm font-medium line-clamp-2 flex-1">{issue.title}</h3>
+        </div>
+        <div className="flex gap-1">
+          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${priority.bg} ${priority.color} border`}>
+            {priority.label}
+          </Badge>
+          {issue.scene && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+              {SCENE_LABELS[issue.scene] || issue.scene}
+            </Badge>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ==========================================
 // Main Board View
 // ==========================================
 
@@ -653,6 +801,9 @@ export function BoardView() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterAssignee, setFilterAssignee] = useState('all')
   const [filterPriority, setFilterPriority] = useState('all')
+
+  const changeStatusMutation = useUpdateIssueStatus()
+  const deleteIssueMutation = useDeleteIssue()
 
   const hasActiveFilters = searchQuery || filterAssignee !== 'all' || filterPriority !== 'all'
 
@@ -685,14 +836,43 @@ export function BoardView() {
     setDetailOpen(true)
   }, [])
 
+  const handleQuickAction = useCallback((issue: Issue, action: string) => {
+    if (action === 'start') {
+      // Move to in_progress
+      const valid = VALID_TRANSITIONS[issue.status] || []
+      if (valid.includes('in_progress')) {
+        changeStatusMutation.mutate({ id: issue.id, data: { status: 'in_progress' } })
+      } else if (valid.includes('triaged')) {
+        changeStatusMutation.mutate({ id: issue.id, data: { status: 'triaged' } })
+      }
+    } else if (action === 'execute') {
+      // Execute via daemon
+      if (issue.assigneeId) {
+        fetch('/api/execute?XTransformPort=3003', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            issueId: issue.id,
+            agentId: issue.assigneeId,
+            taskDescription: issue.description || issue.title,
+          }),
+        }).then(() => {
+          toast.success('任务已提交执行')
+        }).catch(() => {
+          toast.error('执行请求失败')
+        })
+      }
+    } else if (action === 'delete') {
+      deleteIssueMutation.mutate(issue.id)
+    }
+  }, [changeStatusMutation, deleteIssueMutation])
+
   // DnD setup
   const [activeId, setActiveId] = useState<string | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor)
   )
-
-  const changeStatusMutation = useUpdateIssueStatus()
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string)
@@ -736,7 +916,7 @@ export function BoardView() {
           </h1>
           <p className="text-muted-foreground mt-1">看板视图 - 拖拽管理任务状态</p>
         </div>
-        <Button className="gap-2" onClick={() => setCreateDialogOpen(true)}>
+        <Button className="gap-2 hover:-translate-y-0.5 transition-all" onClick={() => setCreateDialogOpen(true)}>
           <Plus className="size-4" />
           新建 Issue
         </Button>
@@ -849,22 +1029,17 @@ export function BoardView() {
                 config={col}
                 issues={columnIssues[col.id] || []}
                 onIssueClick={handleIssueClick}
+                onQuickAction={handleQuickAction}
               />
             ))}
           </div>
 
-          <DragOverlay>
+          <DragOverlay dropAnimation={{
+            duration: 200,
+            easing: 'ease',
+          }}>
             {activeIssue ? (
-              <Card className="shadow-xl border-t-2 max-w-[320px] opacity-90">
-                <CardContent className="p-3 space-y-2">
-                  <h3 className="text-sm font-medium line-clamp-2">{activeIssue.title}</h3>
-                  <div className="flex gap-1">
-                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${(PRIORITY_CONFIG[activeIssue.priority] || PRIORITY_CONFIG.medium).bg} ${(PRIORITY_CONFIG[activeIssue.priority] || PRIORITY_CONFIG.medium).color} border`}>
-                      {(PRIORITY_CONFIG[activeIssue.priority] || PRIORITY_CONFIG.medium).label}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
+              <DragOverlayCard issue={activeIssue} />
             ) : null}
           </DragOverlay>
         </DndContext>

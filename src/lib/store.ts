@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 
-export type ActiveView = 'dashboard' | 'board' | 'agents' | 'monitor' | 'skills' | 'settings'
+export type ActiveView = 'dashboard' | 'board' | 'inspirations' | 'agents' | 'monitor' | 'skills' | 'settings'
 
 interface AppStore {
   // Navigation

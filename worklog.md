@@ -584,3 +584,211 @@ Stage Summary:
 3. Board 视图的 Issue 执行功能（触发 Daemon 执行）
 4. 会话恢复功能（同一 Issue 的 Agent 对话可继续）
 5. Skill 自动匹配注入 Agent
+
+---
+
+Task ID: bugfix+seed
+Agent: Bug Fix & Seed Agent
+Task: 修复关键Bug + 添加种子数据初始化
+
+Work Log:
+- 修复 Bug #1: 移除5个API路由中 broadcastEvent 的 await，使其真正非阻塞
+  - /api/members/route.ts - agent:status
+  - /api/issues/route.ts - issue:created
+  - /api/comments/route.ts - comment:added
+  - /api/issues/[id]/status/route.ts - issue:status
+  - /api/inspirations/[id]/analyze/route.ts - inspiration:update + issue:created
+- 修复 Bug #2: 在 useStats、useMembers、useIssues 查询中添加 refetchOnMount: 'always'
+- 修复 Bug #3: Dashboard空态增强——无Agent时显示醒目的CTA卡片和"一键创建团队"按钮
+- 创建 /api/seed 端点——幂等种子数据初始化：
+  - 3个默认Agent（CodeAgent/ReviewBot/DocAgent）
+  - 5个内置Skill（Bug修复/功能开发/代码审查/文档生成/数据分析）
+  - 3个Demo Issue（不同状态+优先级）
+  - 4条Demo评论（Agent+人类）
+  - 1条已转化灵感
+- 创建 /src/lib/use-seed-data.ts hook——首次访问提示创建示例数据
+- Settings页面添加"数据管理"卡片和"重置示例数据"按钮
+
+Stage Summary:
+- 所有关键Bug已修复，API不再因WS服务状态阻塞
+- 种子数据功能完整，首次使用体验大幅提升
+- ESLint检查通过
+
+---
+
+Task ID: style+enhance
+Agent: Style & Enhancement Agent
+Task: UI样式增强 + 新功能开发
+
+Work Log:
+- Dashboard增强：
+  - useCountUp hook 数字计数动画
+  - Sparkline SVG 迷你图（渐变填充+趋势线）
+  - 空态CTA卡片（无Agent时）
+  - 灵感管线可视化（水平漏斗：灵感→分析→转化）
+  - 活动时间线按日期分组（今天/昨天/更早）+ 彩色左边框
+- Board增强：
+  - Issue卡片优先级色条（红/橙/蓝/灰左边框）
+  - 场景图标 + 评论计数显示
+  - 列WIP限制+超限红标
+  - Hover快捷操作按钮（执行/删除）
+  - "🚀 执行任务"按钮（POST到Daemon 3003端口）
+  - 自定义拖拽覆盖层（旋转+阴影+模糊）
+- 命令面板（Cmd/Ctrl+K）：
+  - 搜索 Issues/Agents/Skills/Inspirations
+  - 快捷操作（表达想法/新建Issue/注册Agent/创建技能）
+  - 视图导航
+  - 搜索栏点击触发
+- 新增 Inspirations 历史视图：
+  - 4张统计卡片（待分析/分析中/已转化/已忽略）
+  - 状态过滤+来源Badge
+  - 操作：重试分析/忽略/查看关联任务
+  - 侧边栏新导航项（Lightbulb图标）
+- 样式打磨：
+  - 页面切换动画增强（scale+fade+translate）
+  - 卡片hover效果（-translate-y-0.5 + shadow-md）
+  - 活跃导航项左边框标识（border-l-2 border-l-primary）
+  - 滚动阴影CSS工具类
+  - Skeleton加载态优化
+
+Stage Summary:
+- 7个视图（新增Inspirations）
+- 命令面板 Cmd+K 全局搜索
+- Issue执行功能（触发Daemon）
+- 样式大幅提升：动画/微交互/视觉细节
+- ESLint检查通过
+
+---
+
+## 项目当前状态（2026-04-30 审查后更新）
+
+### 判断
+平台MVP功能完整，核心交互闭环可用，样式和交互已显著增强。当前处于"可用但需持续打磨"阶段。
+
+### 已完成
+1. ✅ 9个数据库模型 + 19+ API路由
+2. ✅ 7个前端视图（Dashboard/Board/Inspirations/Agents/Monitor/Skills/Settings）
+3. ✅ 灵感→Agent分析→Issue创建完整闭环
+4. ✅ 看板拖拽 + 状态机 + 优先级色条 + 执行任务
+5. ✅ Cmd+K命令面板
+6. ✅ Daemon服务（CLI探测+Agent执行+心跳）
+7. ✅ WebSocket实时推送
+8. ✅ 种子数据一键初始化
+9. ✅ 暗色/亮色主题 + 动画 + 微交互
+10. ✅ 审计日志 + 15分钟定时审查
+
+### 未解决/风险
+1. Seed API的幂等检查可能过于宽松（只检查count>0，不检查具体名称）
+2. 命令面板搜索功能需要更多数据才能体现价值
+3. 灵感分析在没有在线Agent时会静默失败，用户缺少明确反馈
+4. Board拖拽状态机验证在拖到非法列时应该给toast提示
+
+### 建议下一阶段优先事项
+1. 灵感分析失败时明确提示"请先创建在线Agent"
+2. Board拖拽非法状态变更添加toast提示
+3. Agent详情页增加"执行历史"完整列表
+4. 会话恢复功能（同一Issue的Agent对话可继续）
+5. 移动端响应式进一步优化
+
+---
+
+Task ID: bugfix+seed
+Agent: Bug Fix & Seed Data Developer
+Task: 修复3个已知Bug + 创建种子数据功能
+
+Work Log:
+- Bug #1 修复: 将5个API路由中的 `await broadcastEvent(...)` 改为 `broadcastEvent(...)`（fire-and-forget），确保WS服务不可用时API响应不会挂起
+  - /src/app/api/members/route.ts - agent:status 事件
+  - /src/app/api/issues/route.ts - issue:created 事件
+  - /src/app/api/comments/route.ts - comment:added 事件
+  - /src/app/api/issues/[id]/status/route.ts - issue:status 事件
+  - /src/app/api/inspirations/[id]/analyze/route.ts - inspiration:update + issue:created 事件
+- Bug #2 修复: 在 /src/lib/hooks.ts 中为 useStats、useMembers、useIssues 三个关键查询添加 `refetchOnMount: 'always'`，确保每次挂载组件时重新获取最新数据
+- Bug #3 修复: 在 /src/components/views/dashboard-view.tsx 中：
+  - 顶部Empty State CTA改为调用 POST /api/seed 一键创建默认团队（之前只是跳转到Agents页面）
+  - Agent团队卡片的空状态改为带CTA按钮的"还没有 Agent 团队成员"，点击可一键创建
+  - 添加 PlusCircle 图标、useQueryClient、toast 等依赖
+- 修复 useCountUp hook 的 lint 错误（react-hooks/set-state-in-effect）：移除 useEffect 内的 setCount 初始化，改为 useState(end) 初始化
+- 创建 /src/app/api/seed/route.ts - POST /api/seed 种子数据端点：
+  - 创建3个默认Agent（CodeAgent/ReviewBot/DocAgent），带完整配置（能力标签、系统提示词、状态）
+  - 创建5个内置技能（Bug修复/功能开发/代码审查/文档生成/数据分析），含Prompt模板
+  - 创建3个不同状态的Issue（in_progress/open/in_review），对应不同Agent指派
+  - 创建4条评论（2条Agent评论+1条Agent文档评论+1条人类评论）
+  - 创建1个已转换灵感"我想做一个AI协作平台"
+  - 所有创建操作幂等（先检查是否已存在）
+- 创建 /src/lib/use-seed-data.ts - 首次访问种子数据引导 hook：
+  - 检查 localStorage 'agentteam-seeded' 标记
+  - 提供 seedData() 方法调用 /api/seed
+  - 提供 dismiss() 方法关闭引导
+  - 成功后自动 invalidate queries + toast 通知
+- 在 /src/components/views/settings-view.tsx 添加"数据管理"卡片：
+  - "重置示例数据"按钮，带旋转动画
+  - 调用 POST /api/seed 重新创建示例数据
+  - 成功后 invalidate queries + toast 通知
+- 所有 ESLint 检查通过
+
+Stage Summary:
+- 3个Bug全部修复：broadcastEvent非阻塞、查询刷新策略优化、Dashboard空态CTA
+- 种子数据端点完整：3 Agent + 5 Skill + 3 Issue + 4 Comment + 1 Inspiration
+- useSeedData hook 提供首次访问引导能力
+- Settings 页新增"重置示例数据"功能
+- useCountUp hook lint 修复（附带修复）
+
+---
+
+Task ID: style+enhance
+Agent: Style & Enhancement Developer
+Task: 增强样式和添加新功能
+
+Work Log:
+- 更新 /src/lib/store.ts - ActiveView 类型添加 'inspirations' 视图
+- 重写 /src/components/views/dashboard-view.tsx - 增强 Dashboard：
+  - useCountUp Hook：数值变化时的计数动画（easeOutCubic 缓动）
+  - Sparkline SVG 迷你图表：每个统计卡片内的趋势线图（渐变填充+折线）
+  - AnimatedStatCard 组件：带动画数值、sparkline、hover 缩放图标
+  - 空态 CTA 卡片：无 Agent 时显示"一键创建团队"引导卡片（图标+描述+按钮）
+  - 灵感管线可视化：灵感(N) → 分析中(N) → 已转化(N) 水平漏斗，带箭头连接
+  - 活动时间线增强：按日期分组（今天/昨天/更早），彩色左边框（蓝/绿/紫/琥珀/红），hover 高亮
+- 重写 /src/components/views/board-view.tsx - 增强 Board：
+  - Issue 卡片左边框按优先级着色（red=urgent, orange=high, blue=medium, gray=low）
+  - 场景图标：code-gen=Code, doc=FileText, analysis=BarChart3, review=Eye
+  - 评论计数显示：卡片底部显示 💬 数字
+  - 列 WIP 限制：列头显示 count/limit，超限时 Badge 变红+脉冲动画
+  - 快速操作 hover：悬停卡片显示"开始处理"、"执行任务"、"删除"小按钮
+  - "🚀 执行任务"按钮：Issue 详情 Sheet 中的突出按钮，POST /api/execute?XTransformPort=3003
+  - 自定义 DragOverlay 卡片：旋转2度+阴影+ring+毛玻璃背景
+  - 所有卡片添加 hover:-translate-y-0.5 和 hover:shadow-md 过渡效果
+- 创建 /src/components/command-palette.tsx - Cmd+K 命令面板：
+  - 使用 shadcn/ui CommandDialog/CommandInput/CommandList/CommandGroup/CommandItem
+  - 快速操作：表达想法、新建 Issue、注册 Agent、创建技能
+  - 导航：7个视图快速切换（含中文关键词搜索）
+  - 搜索 Issues：显示标题+状态，点击跳转 Board
+  - 搜索 Agents：显示名称+状态圆点
+  - 搜索 Skills 和 Inspirations
+  - Cmd/Ctrl+K 键盘快捷键
+- 创建 /src/components/views/inspirations-view.tsx - 灵感历史视图：
+  - 4张统计卡片：待分析/分析中/已转化/已忽略（带彩色图标）
+  - 状态过滤器（全部/待分析/分析中/已转化/已忽略，带计数）
+  - 灵感卡片：状态图标+内容+来源Badge+状态Badge+时间+转化任务列表
+  - 操作按钮：重新分析、忽略、查看任务
+  - 空态引导：Lightbulb 图标+"表达想法"按钮
+  - PATCH /api/inspirations/[id] 调用实现忽略功能
+- 重写 /src/components/app-shell.tsx - 集成新功能：
+  - 导航项添加 Inspirations（Lightbulb 图标），位于 Board 和 Agents 之间
+  - 集成 CommandPalette 组件
+  - HeaderBar 搜索栏点击打开命令面板
+  - Cmd/Ctrl+K 键盘监听
+  - ViewRenderer 增强：添加 scale(0.98) 微缩放+fade+translate 的页面切换动画
+  - 侧栏活跃项添加 border-l-2 border-l-primary 左边框指示器
+  - 导入 InspirationsView 视图
+- 更新 /src/app/globals.css - 样式优化：
+  - 添加 scroll-shadow-y 工具类（渐变阴影滚动效果）
+  - 保留 glass-effect 和自定义滚动条样式
+
+Stage Summary:
+- Dashboard：动画统计卡片+sparkline+空态CTA+灵感管线+活动分组
+- Board：优先级边框+WIP限制+快速操作+执行任务按钮+自定义拖拽覆盖
+- Command Palette：Cmd+K 全局搜索和快捷操作
+- Inspirations 视图：完整的灵感历史浏览、过滤、重试、忽略
+- 样式优化：页面切换动画、hover效果、活跃导航指示器、滚动阴影
+- 所有 ESLint 检查通过，应用正常编译运行

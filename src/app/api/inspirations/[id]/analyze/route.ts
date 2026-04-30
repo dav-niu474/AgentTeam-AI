@@ -208,8 +208,8 @@ Example: [{"title": "...", "description": "...", "priority": "medium", "scene": 
     });
 
     // Broadcast real-time events
-    await broadcastEvent('inspiration:update', { inspirationId: id, status: 'converted', issuesCreated: createdIssues.length });
-    await broadcastEvent('issue:created', { count: createdIssues.length, inspirationId: id, agentId: analysisAgentId });
+    broadcastEvent('inspiration:update', { inspirationId: id, status: 'converted', issuesCreated: createdIssues.length });
+    broadcastEvent('issue:created', { count: createdIssues.length, inspirationId: id, agentId: analysisAgentId });
 
     return NextResponse.json({
       inspiration: updatedInspiration,

@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Broadcast real-time event
-    await broadcastEvent('issue:created', { issueId: issue.id, title: issue.title, creatorId, assigneeId });
+    broadcastEvent('issue:created', { issueId: issue.id, title: issue.title, creatorId, assigneeId });
 
     return NextResponse.json(issue, { status: 201 });
   } catch (error) {

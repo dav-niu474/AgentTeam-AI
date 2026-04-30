@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import {
   Settings, Monitor, Bell, Shield, User, Server, Wifi, WifiOff,
   Plus, Trash2, Edit3, Save, X, Database, Brain, RefreshCw,
+  RotateCcw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,6 +29,7 @@ import {
 import { parseJsonField, type MemoryEntry } from '@/lib/api'
 import { useCurrentUser } from '@/lib/use-current-user'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 
 // ============ Notification Preferences ============
 
@@ -193,6 +195,8 @@ export function SettingsView() {
   const [addMemOpen, setAddMemOpen] = useState(false)
   const [newDaemonOpen, setNewDaemonOpen] = useState(false)
   const [daemonForm, setDaemonForm] = useState({ name: '', host: '', port: '' })
+  const [resetting, setResetting] = useState(false)
+  const queryClient = useQueryClient()
 
   // Notification state from memory
   const { data: notifEntries } = useMemory(
@@ -584,6 +588,51 @@ export function SettingsView() {
                 <span>全部需审批 (0)</span>
                 <span>全部自动 (1)</span>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Data Management Section */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Database className="size-4" />
+              数据管理
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">重置示例数据</p>
+                <p className="text-xs text-muted-foreground">重新创建默认Agent团队、技能和示例Issue</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                disabled={resetting}
+                onClick={async () => {
+                  setResetting(true)
+                  try {
+                    const res = await fetch('/api/seed', { method: 'POST' })
+                    if (!res.ok) throw new Error('Seed failed')
+                    const data = await res.json()
+                    await queryClient.invalidateQueries()
+                    toast.success('示例数据已重置', {
+                      description: `已创建 ${data.created?.agents || 0} 个Agent、${data.created?.skills || 0} 个技能、${data.created?.issues || 0} 个Issue`,
+                    })
+                  } catch {
+                    toast.error('重置示例数据失败')
+                  } finally {
+                    setResetting(false)
+                  }
+                }}
+              >
+                <RotateCcw className={`size-3.5 ${resetting ? 'animate-spin' : ''}`} />
+                {resetting ? '重置中...' : '重置示例数据'}
+              </Button>
             </div>
           </CardContent>
         </Card>

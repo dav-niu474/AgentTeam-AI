@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Broadcast real-time event
-    await broadcastEvent('comment:added', { commentId: comment.id, issueId, authorId, authorType });
+    broadcastEvent('comment:added', { commentId: comment.id, issueId, authorId, authorType });
 
     return NextResponse.json(comment, { status: 201 });
   } catch (error) {
