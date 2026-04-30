@@ -1,0 +1,9 @@
+{
+  "buildCommand": "prisma generate && prisma db push --skip-generate && next build",
+  "installCommand": "bun install",
+  "framework": "nextjs",
+  "regions": ["hnd1"],
+  "env": {
+    "DATABASE_URL": "file:/tmp/agentteam.db"
+  }
+}
