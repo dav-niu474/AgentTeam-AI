@@ -106,6 +106,7 @@ import {
   useCreateSubtask,
   useSubtasks,
 } from '@/lib/hooks'
+import { useQueryClient } from '@tanstack/react-query'
 import { useCurrentUser } from '@/lib/use-current-user'
 import { useAppStore, type BoardViewMode } from '@/lib/store'
 import { parseJsonField } from '@/lib/api'
@@ -533,9 +534,11 @@ function IssueDetailSheet({
   const [chatMode, setChatMode] = useState(false)
   const [chatMessage, setChatMessage] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
+  const [streamingText, setStreamingText] = useState('')
   const changeStatusMutation = useUpdateIssueStatus()
   const updateIssueMutation = useUpdateIssue()
   const createCommentMutation = useCreateComment()
+  const queryClient = useQueryClient()
   const { data: commentsData, isLoading: commentsLoading } = useComments(issue?.id ? { issueId: issue.id } : undefined)
 
   if (!issue) return null
@@ -608,28 +611,80 @@ function IssueDetailSheet({
       toast.error('请先指派一个 Agent 再对话')
       return
     }
+    const userMsg = chatMessage.trim()
+    setChatMessage('')
     setChatLoading(true)
+    setStreamingText('')
+
     try {
-      const res = await fetch('/api/chat', {
+      // Use streaming API for real-time text display
+      const res = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           issueId: issue.id,
-          message: chatMessage.trim(),
+          message: userMsg,
           agentId: issue.assigneeId,
           userId,
         }),
       })
+
       if (!res.ok) {
+        // Fallback to non-streaming API
         const errData = await res.json().catch(() => ({}))
         throw new Error((errData as Record<string, string>).error || '对话请求失败')
       }
-      setChatMessage('')
-      toast.success('Agent 已回复')
+
+      const contentType = res.headers.get('content-type') || ''
+      if (contentType.includes('text/event-stream')) {
+        // Process SSE stream
+        const reader = res.body?.getReader()
+        if (!reader) throw new Error('No stream reader')
+
+        const decoder = new TextDecoder()
+        let accumulated = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          const chunk = decoder.decode(value, { stream: true })
+          const lines = chunk.split('\n')
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6))
+                if (data.type === 'chunk') {
+                  accumulated += data.content
+                  setStreamingText(accumulated)
+                } else if (data.type === 'done') {
+                  // Stream complete
+                } else if (data.type === 'error') {
+                  toast.error('Agent 回复出错')
+                }
+              } catch {
+                // Skip unparseable lines
+              }
+            }
+          }
+        }
+      } else {
+        // Fallback: non-streaming response
+        const data = await res.json()
+        if (data.agentComment) {
+          setStreamingText(data.agentComment.content)
+        }
+      }
+
+      // Invalidate queries to refresh comments
+      queryClient.invalidateQueries({ queryKey: ['comments'] })
+      queryClient.invalidateQueries({ queryKey: ['issues'] })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '对话请求失败')
     } finally {
       setChatLoading(false)
+      setStreamingText('')
     }
   }
 
@@ -815,8 +870,19 @@ function IssueDetailSheet({
                 </div>
               )}
 
-              {/* Typing indicator */}
-              {chatLoading && (
+              {/* Streaming text or typing indicator */}
+              {chatLoading && streamingText ? (
+                <div className="flex justify-start">
+                  <div className="bg-primary/10 rounded-lg px-3 py-2 rounded-tl-none max-w-[85%]">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Bot className="size-3 text-primary" />
+                      <span className="text-[10px] font-medium text-primary">{issue.assignee?.name || 'Agent'}</span>
+                      <span className="text-[9px] text-primary/50 animate-pulse">生成中...</span>
+                    </div>
+                    <p className="whitespace-pre-wrap text-sm">{streamingText}</p>
+                  </div>
+                </div>
+              ) : chatLoading && (
                 <div className="flex justify-start">
                   <div className="bg-primary/10 rounded-lg px-3 py-2 rounded-tl-none">
                     <div className="flex items-center gap-1.5">
