@@ -112,6 +112,7 @@ import { useAppStore, type BoardViewMode } from '@/lib/store'
 import { parseJsonField } from '@/lib/api'
 import type { Issue, Member } from '@/lib/api'
 import { toast } from 'sonner'
+import { MarkdownRenderer } from '@/components/markdown-renderer'
 
 // ==========================================
 // Constants
@@ -730,9 +731,9 @@ function IssueDetailSheet({
         {/* Description */}
         <div className="mb-6">
           <h4 className="text-sm font-medium mb-2">描述</h4>
-          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-            {issue.description || '暂无描述'}
-          </p>
+          <div className="text-sm text-muted-foreground">
+            {issue.description ? <MarkdownRenderer content={issue.description} /> : <span className="text-muted-foreground/60">暂无描述</span>}
+          </div>
         </div>
 
         {/* Info */}
@@ -863,7 +864,7 @@ function IssueDetailSheet({
                             {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: false, locale: zhCN })}
                           </span>
                         </div>
-                        <p className="whitespace-pre-wrap">{comment.content}</p>
+                    <p className="whitespace-pre-wrap"><MarkdownRenderer content={comment.content} /></p>
                       </div>
                     </div>
                   ))}
@@ -879,7 +880,7 @@ function IssueDetailSheet({
                       <span className="text-[10px] font-medium text-primary">{issue.assignee?.name || 'Agent'}</span>
                       <span className="text-[9px] text-primary/50 animate-pulse">生成中...</span>
                     </div>
-                    <p className="whitespace-pre-wrap text-sm">{streamingText}</p>
+                    <MarkdownRenderer content={streamingText} />
                   </div>
                 </div>
               ) : chatLoading && (
@@ -969,7 +970,7 @@ function IssueDetailSheet({
                         {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: zhCN })}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-0.5 whitespace-pre-wrap">{comment.content}</p>
+                    <div className="text-sm text-muted-foreground mt-0.5"><MarkdownRenderer content={comment.content} /></div>
                   </div>
                 </div>
               ))}
