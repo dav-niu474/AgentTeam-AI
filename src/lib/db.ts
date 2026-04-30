@@ -63,14 +63,35 @@ async function initializeDb(): Promise<void> {
   try {
     // Run prisma db push to create the schema
     // This is necessary on Vercel where /tmp is empty on cold start
-    const schemaPath = path.join(process.cwd(), 'prisma', 'schema.prisma')
-    console.log('[db-init] Running prisma db push with schema at', schemaPath)
+    const prismaBin = path.join(process.cwd(), 'node_modules', '.bin', 'prisma')
+    console.log('[db-init] Running prisma db push from', prismaBin)
 
-    execSync('npx prisma db push --skip-generate --accept-data-loss 2>&1', {
-      env: { ...process.env, DATABASE_URL: databaseUrl },
-      stdio: 'pipe',
-      timeout: 30000,
-    })
+    // Try multiple approaches to find the prisma binary
+    const prismaCommands = [
+      `${prismaBin} db push --skip-generate --accept-data-loss`,
+      'node ./node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss',
+      'npx prisma db push --skip-generate --accept-data-loss',
+    ]
+
+    let pushed = false
+    for (const cmd of prismaCommands) {
+      try {
+        execSync(cmd + ' 2>&1', {
+          env: { ...process.env, DATABASE_URL: databaseUrl },
+          stdio: 'pipe',
+          timeout: 30000,
+        })
+        pushed = true
+        console.log('[db-init] Schema pushed successfully with:', cmd.split(' ')[0])
+        break
+      } catch {
+        console.log('[db-init] Command failed:', cmd.split(' ')[0])
+      }
+    }
+
+    if (!pushed) {
+      throw new Error('All prisma db push commands failed')
+    }
 
     console.log('[db-init] Schema pushed successfully')
 
