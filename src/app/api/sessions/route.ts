@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 
 // GET /api/sessions - List sessions, filter by ?agentId=xxx&issueId=xxx&status=xxx
 export async function GET(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const { searchParams } = new URL(request.url);
     const agentId = searchParams.get('agentId');
     const issueId = searchParams.get('issueId');
@@ -55,6 +56,7 @@ export async function GET(request: NextRequest) {
 // POST /api/sessions - Create or resume session
 export async function POST(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const body = await request.json();
     const { agentId, issueId, workingDir, gitBranch, context, status = 'active' } = body;
 

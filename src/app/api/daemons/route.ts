@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 
 // GET /api/daemons - List daemons
 export async function GET(_request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const daemons = await db.daemon.findMany({
       orderBy: { updatedAt: 'desc' },
     });
@@ -21,6 +22,7 @@ export async function GET(_request: NextRequest) {
 // POST /api/daemons - Register a daemon
 export async function POST(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const body = await request.json();
     const { name, host, port, availableTools, status = 'online' } = body;
 

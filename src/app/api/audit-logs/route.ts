@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 
 // GET /api/audit-logs - List audit logs with filters
 export async function GET(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const { searchParams } = new URL(request.url);
     const actorId = searchParams.get('actorId');
     const action = searchParams.get('action');

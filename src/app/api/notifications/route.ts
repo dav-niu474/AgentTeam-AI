@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 
 // GET /api/notifications - Return recent audit logs as notifications
 // Query params: limit (default 50), unreadIds (comma-separated IDs that are unread)
 export async function GET(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const { searchParams } = new URL(request.url);
     const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
     const unreadIdsStr = searchParams.get('unreadIds') || '';

@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 
 // GET /api/stats - Dashboard statistics
 export async function GET() {
   try {
+    // Ensure database is initialized (for Vercel serverless)
+    await ensureDbInitialized();
     // Issue counts by status
     const [
       openCount,

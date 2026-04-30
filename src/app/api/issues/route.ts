@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { broadcastEvent } from '@/lib/events';
 
 // GET /api/issues - List issues with filters
 export async function GET(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const assigneeId = searchParams.get('assigneeId');
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
 // POST /api/issues - Create issue (both human-created and agent-created)
 export async function POST(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const body = await request.json();
     const {
       title,

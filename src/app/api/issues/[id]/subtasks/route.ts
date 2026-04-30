@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { broadcastEvent } from '@/lib/events';
 
@@ -13,6 +13,7 @@ export async function GET(
   context: RouteContext,
 ) {
   try {
+    await ensureDbInitialized();
     const { id } = await context.params;
 
     const subtasks = await db.issue.findMany({
@@ -40,6 +41,7 @@ export async function POST(
   context: RouteContext,
 ) {
   try {
+    await ensureDbInitialized();
     const { id } = await context.params;
     const body = await request.json();
 

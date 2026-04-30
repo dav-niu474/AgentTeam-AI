@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 import { parseJsonField } from '@/lib/api';
 
 // POST /api/agents/auto-assign - Find the best available agent for a task
 export async function POST(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const body = await request.json();
     const { issueId, scene, capabilities } = body as {
       issueId?: string;

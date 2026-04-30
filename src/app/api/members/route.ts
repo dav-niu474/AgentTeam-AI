@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 import { broadcastEvent } from '@/lib/events';
 
 // GET /api/members - List all members, support ?type=agent or ?type=human filter
 export async function GET(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
 
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
 // POST /api/members - Create a new member (human or agent)
 export async function POST(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const body = await request.json();
     const {
       type = 'human',

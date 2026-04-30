@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { broadcastEvent } from '@/lib/events';
 
@@ -23,6 +23,7 @@ export async function PATCH(
   context: RouteContext
 ) {
   try {
+    await ensureDbInitialized();
     const { id } = await context.params;
     const body = await request.json();
     const { status: newStatus, actorId } = body;

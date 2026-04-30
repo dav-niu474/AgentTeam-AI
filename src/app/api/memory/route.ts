@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 
 // GET /api/memory - List memory entries for a user: ?userId=xxx&category=xxx
 export async function GET(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const category = searchParams.get('category');
@@ -36,6 +37,7 @@ export async function GET(request: NextRequest) {
 // POST /api/memory - Create/update memory entry
 export async function POST(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const body = await request.json();
     const { userId, category, key, value, confidence = 0.5, source } = body;
 

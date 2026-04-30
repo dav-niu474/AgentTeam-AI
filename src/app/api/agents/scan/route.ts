@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { broadcastEvent } from '@/lib/events';
 import { parseJsonField } from '@/lib/api';
@@ -8,6 +8,7 @@ import ZAI from 'z-ai-web-dev-sdk';
 // POST /api/agents/scan - Agent proactively scans project and creates issues
 export async function POST() {
   try {
+    await ensureDbInitialized();
     // Find an online agent to perform the scan (prefer autopilot agents)
     const agent = await db.member.findFirst({
       where: { type: 'agent', autopilot: true, agentStatus: { in: ['online', 'busy'] } },

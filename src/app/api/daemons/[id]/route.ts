@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -11,6 +11,7 @@ export async function GET(
   context: RouteContext
 ) {
   try {
+    await ensureDbInitialized();
     const { id } = await context.params;
 
     const daemon = await db.daemon.findUnique({ where: { id } });
@@ -38,6 +39,7 @@ export async function PATCH(
   context: RouteContext
 ) {
   try {
+    await ensureDbInitialized();
     const { id } = await context.params;
     const body = await request.json();
     const { name, host, port, status, availableTools } = body;

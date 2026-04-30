@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 import { broadcastEvent } from '@/lib/events';
 
 // POST /api/seed - Initialize demo data
 export async function POST() {
   try {
+    await ensureDbInitialized();
     const results = {
       agents: [] as string[],
       skills: [] as string[],

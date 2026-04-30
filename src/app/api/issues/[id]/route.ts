@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 
 type RouteContext = {
@@ -12,6 +12,7 @@ export async function GET(
   context: RouteContext
 ) {
   try {
+    await ensureDbInitialized();
     const { id } = await context.params;
 
     const issue = await db.issue.findUnique({
@@ -84,6 +85,7 @@ export async function PATCH(
   context: RouteContext
 ) {
   try {
+    await ensureDbInitialized();
     const { id } = await context.params;
     const body = await request.json();
     const {
@@ -159,6 +161,7 @@ export async function DELETE(
   context: RouteContext
 ) {
   try {
+    await ensureDbInitialized();
     const { id } = await context.params;
 
     const existing = await db.issue.findUnique({ where: { id } });

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 
 // GET /api/inspirations - List inspirations, filter by ?status=pending&creatorId=xxx
 export async function GET(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const creatorId = searchParams.get('creatorId');
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
 // POST /api/inspirations - Create inspiration (user's raw idea/input)
 export async function POST(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const body = await request.json();
     const { content, source = 'chat', creatorId } = body;
 

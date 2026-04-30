@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { broadcastEvent } from '@/lib/events';
 
 // GET /api/comments - List comments for an issue: ?issueId=xxx
 export async function GET(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const { searchParams } = new URL(request.url);
     const issueId = searchParams.get('issueId');
 
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest) {
 // POST /api/comments - Add comment (human or agent)
 export async function POST(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const body = await request.json();
     const { content, authorId, issueId, authorType = 'human', metadata } = body;
 

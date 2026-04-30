@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureDbInitialized } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { broadcastEvent } from '@/lib/events';
 
@@ -7,6 +7,7 @@ import { broadcastEvent } from '@/lib/events';
 // Body: { issueId: string, message: string, agentId?: string }
 export async function POST(request: NextRequest) {
   try {
+    await ensureDbInitialized();
     const body = await request.json();
     const { issueId, message, agentId } = body;
 
