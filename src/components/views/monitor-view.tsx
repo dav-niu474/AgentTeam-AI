@@ -28,7 +28,7 @@ import {
   useAuditLogs, useSessions, useDaemons, useStats,
   useCreateDaemon, useUpdateDaemon,
 } from '@/lib/hooks'
-import { parseJsonField, type Session, type SessionDetail } from '@/lib/api'
+import { parseJsonField, type Session } from '@/lib/api'
 import { toast } from 'sonner'
 
 // ============ Register Daemon Dialog ============
@@ -151,7 +151,7 @@ function SessionDetailSheet({
               {Array.isArray(messages) && messages.length > 0 ? (
                 <div className="space-y-2">
                   {messages.map((msg, i) => (
-                    <div key={i} className="rounded-md bg-muted/50 p-3 text-sm font-mono">
+                    <div key={i} className="rounded-md bg-muted/50 p-3 text-sm font-mono border border-border/30">
                       <pre className="whitespace-pre-wrap text-xs">{JSON.stringify(msg, null, 2)}</pre>
                     </div>
                   ))}
@@ -169,25 +169,41 @@ function SessionDetailSheet({
 
 // ============ Log Entry ============
 
-function LogEntry({ log }: { log: { id: string; createdAt: string; actorType: string; actor?: { name: string }; action: string; targetType: string; targetId: string } }) {
-  const actorColor = log.actorType === 'agent' ? 'text-emerald-400' : log.actorType === 'human' ? 'text-blue-400' : 'text-gray-400'
+function LogEntry({ log, isNew }: { log: { id: string; createdAt: string; actorType: string; actor?: { name: string }; action: string; targetType: string; targetId: string }; isNew?: boolean }) {
+  const actorColor = log.actorType === 'agent' ? 'text-emerald-400' : log.actorType === 'human' ? 'text-sky-400' : 'text-gray-400'
   const actorLabel = log.actorType === 'agent' ? 'AGENT' : log.actorType === 'human' ? 'HUMAN' : 'SYS'
 
+  // Syntax highlight for actions
+  const actionColor = (() => {
+    if (log.action.includes('create')) return 'text-emerald-300'
+    if (log.action.includes('delete')) return 'text-red-400'
+    if (log.action.includes('status') || log.action.includes('change')) return 'text-amber-300'
+    if (log.action.includes('comment')) return 'text-sky-300'
+    if (log.action.includes('analyze')) return 'text-violet-300'
+    if (log.action.includes('assign')) return 'text-cyan-300'
+    return 'text-gray-300'
+  })()
+
   return (
-    <div className="flex items-start gap-2 py-1.5 px-2 hover:bg-white/5 rounded text-xs font-mono transition-colors">
+    <motion.div
+      initial={isNew ? { opacity: 0, x: -8 } : false}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+      className="flex items-start gap-2 py-1.5 px-2 hover:bg-white/5 rounded text-xs font-mono transition-colors group"
+    >
       <span className="text-gray-500 shrink-0">
         [{new Date(log.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]
       </span>
       <span className={`${actorColor} shrink-0 font-semibold`}>
         [{actorLabel}/{log.actor?.name || 'unknown'}]
       </span>
-      <span className="text-gray-300">
+      <span className={actionColor}>
         {log.action}
       </span>
       <span className="text-gray-500 truncate">
         → {log.targetType}:{log.targetId.slice(0, 8)}
       </span>
-    </div>
+    </motion.div>
   )
 }
 
@@ -200,6 +216,7 @@ export function MonitorView() {
   const [filterActorType, setFilterActorType] = useState<string>('all')
   const [filterAction, setFilterAction] = useState<string>('all')
   const logEndRef = useRef<HTMLDivElement>(null)
+  const prevLogCountRef = useRef(0)
 
   // Auto-refresh logs every 10 seconds
   const { data: auditData, isLoading: logsLoading, refetch: refetchLogs } = useAuditLogs({ limit: 50 })
@@ -261,7 +278,7 @@ export function MonitorView() {
           </h1>
           <p className="text-muted-foreground mt-1">实时监控 Agent 执行日志与系统事件</p>
         </div>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => refetchLogs()}>
+        <Button variant="outline" size="sm" className="gap-1.5 hover:-translate-y-0.5 transition-all" onClick={() => refetchLogs()}>
           <RefreshCw className="size-3.5" />
           刷新
         </Button>
@@ -270,12 +287,13 @@ export function MonitorView() {
       {/* System Health Bar */}
       <div className="grid gap-3 md:grid-cols-4">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }}>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-3">
-              <div className="flex size-8 items-center justify-center rounded-full bg-emerald-500/10">
+          <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 dark:hover:border-emerald-600">
+            <CardContent className="flex items-center gap-3 p-3 relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent" />
+              <div className="flex size-8 items-center justify-center rounded-full bg-emerald-500/10 relative">
                 <Cpu className="size-4 text-emerald-500" />
               </div>
-              <div>
+              <div className="relative">
                 <p className="text-lg font-bold">{stats?.agents.byStatus.online ?? 0}<span className="text-muted-foreground text-xs">/{stats?.agents.total ?? 0}</span></p>
                 <p className="text-[10px] text-muted-foreground">在线 Agent</p>
               </div>
@@ -283,12 +301,13 @@ export function MonitorView() {
           </Card>
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-3">
-              <div className="flex size-8 items-center justify-center rounded-full bg-blue-500/10">
-                <HardDrive className="size-4 text-blue-500" />
+          <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 dark:hover:border-teal-600">
+            <CardContent className="flex items-center gap-3 p-3 relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-transparent" />
+              <div className="flex size-8 items-center justify-center rounded-full bg-teal-500/10 relative">
+                <HardDrive className="size-4 text-teal-500" />
               </div>
-              <div>
+              <div className="relative">
                 <p className="text-lg font-bold">{stats?.daemons.online ?? 0}</p>
                 <p className="text-[10px] text-muted-foreground">在线 Daemon</p>
               </div>
@@ -296,12 +315,13 @@ export function MonitorView() {
           </Card>
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-3">
-              <div className="flex size-8 items-center justify-center rounded-full bg-amber-500/10">
+          <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-amber-300 dark:hover:border-amber-600">
+            <CardContent className="flex items-center gap-3 p-3 relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent" />
+              <div className="flex size-8 items-center justify-center rounded-full bg-amber-500/10 relative">
                 <Monitor className="size-4 text-amber-500" />
               </div>
-              <div>
+              <div className="relative">
                 <p className="text-lg font-bold">{stats?.sessions.active ?? 0}</p>
                 <p className="text-[10px] text-muted-foreground">活跃会话</p>
               </div>
@@ -309,12 +329,13 @@ export function MonitorView() {
           </Card>
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-3">
-              <div className="flex size-8 items-center justify-center rounded-full bg-violet-500/10">
-                <Activity className="size-4 text-violet-500" />
+          <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-rose-300 dark:hover:border-rose-600">
+            <CardContent className="flex items-center gap-3 p-3 relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 to-transparent" />
+              <div className="flex size-8 items-center justify-center rounded-full bg-rose-500/10 relative">
+                <Activity className="size-4 text-rose-500" />
               </div>
-              <div>
+              <div className="relative">
                 <p className="text-lg font-bold">{stats?.issues.total ?? 0}</p>
                 <p className="text-[10px] text-muted-foreground">总 Issue</p>
               </div>
@@ -326,19 +347,19 @@ export function MonitorView() {
       {/* Main Content: 2 columns */}
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         {/* Left: Execution Log */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
+        <Card className="overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 bg-gradient-to-r from-gray-950 to-gray-900 dark:from-gray-950 dark:to-gray-900 border-b border-gray-800">
+            <CardTitle className="text-base flex items-center gap-2 text-gray-200">
               <Terminal className="size-4" />
               执行日志
             </CardTitle>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-[10px] gap-1">
+              <Badge variant="outline" className="text-[10px] gap-1 border-emerald-500/30 text-emerald-400">
                 <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 实时
               </Badge>
               <Select value={filterActorType} onValueChange={setFilterActorType}>
-                <SelectTrigger className="h-7 w-24 text-xs">
+                <SelectTrigger className="h-7 w-24 text-xs border-gray-700 bg-gray-800 text-gray-300">
                   <SelectValue placeholder="类型" />
                 </SelectTrigger>
                 <SelectContent>
@@ -349,7 +370,7 @@ export function MonitorView() {
                 </SelectContent>
               </Select>
               <Select value={filterAction} onValueChange={setFilterAction}>
-                <SelectTrigger className="h-7 w-28 text-xs">
+                <SelectTrigger className="h-7 w-28 text-xs border-gray-700 bg-gray-800 text-gray-300">
                   <SelectValue placeholder="操作" />
                 </SelectTrigger>
                 <SelectContent>
@@ -361,18 +382,24 @@ export function MonitorView() {
               </Select>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="rounded-lg bg-gray-950 border border-gray-800 p-2 min-h-[400px] max-h-[500px] overflow-y-auto scrollbar-hidden">
+          <CardContent className="p-0">
+            <div className="rounded-b-lg bg-gray-950 border border-gray-800 border-t-0 p-3 min-h-[400px] max-h-[500px] overflow-y-auto scrollbar-hidden">
               {logsLoading ? (
                 <div className="flex items-center justify-center h-40 text-gray-500">
                   <RefreshCw className="size-5 animate-spin" />
                 </div>
               ) : filteredLogs.length > 0 ? (
                 <div>
-                  {filteredLogs.map((log) => (
-                    <LogEntry key={log.id} log={log} />
-                  ))}
-                  <div ref={logEndRef} />
+                  <AnimatePresence>
+                    {filteredLogs.map((log, idx) => (
+                      <LogEntry
+                        key={log.id}
+                        log={log}
+                        isNew={idx >= filteredLogs.length - 3}
+                      />
+                    ))}
+                  </AnimatePresence>
+                  <div ref={logEndRef} className="terminal-cursor" />
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-40">
@@ -404,7 +431,7 @@ export function MonitorView() {
               {sessionsLoading ? (
                 <div className="space-y-2">
                   {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-14 w-full" />
+                    <Skeleton key={i} className="h-14 w-full shimmer" />
                   ))}
                 </div>
               ) : sessions && sessions.length > 0 ? (
@@ -414,7 +441,7 @@ export function MonitorView() {
                       <button
                         key={session.id}
                         onClick={() => handleViewSession(session)}
-                        className="w-full text-left rounded-md border border-border/50 p-2.5 hover:bg-accent/50 transition-colors"
+                        className="w-full text-left rounded-md border border-border/50 p-2.5 hover:bg-accent/50 transition-all duration-200 hover:border-primary/30 hover:translate-x-0.5"
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium truncate">{session.agent?.name || 'Unknown'}</span>
@@ -450,13 +477,14 @@ export function MonitorView() {
               {daemonsLoading ? (
                 <div className="space-y-2">
                   {Array.from({ length: 2 }).map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
+                    <Skeleton key={i} className="h-16 w-full shimmer" />
                   ))}
                 </div>
               ) : daemons && daemons.length > 0 ? (
                 <div className="space-y-2">
                   {daemons.map((daemon) => {
-                    const tools = parseJsonField<string[]>(daemon.availableTools, [])
+                    const rawTools = parseJsonField<string[]>(daemon.availableTools, [])
+                    const tools = Array.isArray(rawTools) ? rawTools : []
                     const isOnline = daemon.status === 'online'
                     const heartbeatAge = daemon.lastHeartbeat
                       ? Math.round((Date.now() - new Date(daemon.lastHeartbeat).getTime()) / 60000)
@@ -465,12 +493,21 @@ export function MonitorView() {
                     return (
                       <div
                         key={daemon.id}
-                        className="rounded-md border border-border/50 p-3"
+                        className={`rounded-md border p-3 transition-all duration-200 ${
+                          isOnline
+                            ? 'border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40'
+                            : 'border-border/50 hover:border-border'
+                        }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             {isOnline ? (
-                              <Wifi className="size-3.5 text-emerald-500" />
+                              <motion.div
+                                animate={{ scale: [1, 1.1, 1] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                              >
+                                <Wifi className="size-3.5 text-emerald-500" />
+                              </motion.div>
                             ) : (
                               <WifiOff className="size-3.5 text-muted-foreground" />
                             )}
@@ -541,7 +578,7 @@ export function MonitorView() {
                     const pct = Math.round((count / total) * 100)
                     const color =
                       status === 'open' ? 'bg-gray-400' :
-                      status === 'triaged' ? 'bg-blue-400' :
+                      status === 'triaged' ? 'bg-teal-400' :
                       status === 'in_progress' ? 'bg-amber-400' :
                       status === 'in_review' ? 'bg-violet-400' :
                       status === 'resolved' ? 'bg-emerald-400' :

@@ -21,6 +21,7 @@ import {
   LogOut,
   User,
   Lightbulb,
+  Terminal,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,8 +46,10 @@ import { AgentsView } from '@/components/views/agents-view'
 import { MonitorView } from '@/components/views/monitor-view'
 import { SkillsView } from '@/components/views/skills-view'
 import { SettingsView } from '@/components/views/settings-view'
+import { SessionsView } from '@/components/views/sessions-view'
 import { InspirationQuickInput } from '@/components/inspiration-quick-input'
 import { CommandPalette } from '@/components/command-palette'
+import { NotificationPanel } from '@/components/notification-panel'
 import { useRealtime } from '@/hooks/use-realtime'
 
 const navItems: { id: ActiveView; label: string; icon: React.ElementType }[] = [
@@ -55,6 +58,7 @@ const navItems: { id: ActiveView; label: string; icon: React.ElementType }[] = [
   { id: 'inspirations', label: 'Inspirations', icon: Lightbulb },
   { id: 'agents', label: 'Agents', icon: Bot },
   { id: 'monitor', label: 'Monitor', icon: Activity },
+  { id: 'sessions', label: 'Sessions', icon: Terminal },
   { id: 'skills', label: 'Skills', icon: Zap },
   { id: 'settings', label: 'Settings', icon: Settings },
 ]
@@ -79,14 +83,20 @@ function ThemeToggle() {
         <Button
           variant="ghost"
           size="icon"
-          className="size-8"
+          className="size-8 hover:bg-accent/80 transition-colors"
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
         >
-          {theme === 'dark' ? (
-            <Sun className="size-4" />
-          ) : (
-            <Moon className="size-4" />
-          )}
+          <motion.div
+            initial={false}
+            animate={{ rotate: theme === 'dark' ? 180 : 0, scale: theme === 'dark' ? 0.9 : 1 }}
+            transition={{ duration: 0.3, type: 'spring', stiffness: 200 }}
+          >
+            {theme === 'dark' ? (
+              <Sun className="size-4 text-amber-500" />
+            ) : (
+              <Moon className="size-4 text-slate-600" />
+            )}
+          </motion.div>
         </Button>
       </TooltipTrigger>
       <TooltipContent>
@@ -100,7 +110,7 @@ function HeaderBar({ onMobileMenuToggle, onCommandPaletteToggle }: { onMobileMen
   const { setShowInspirationInput } = useAppStore()
 
   return (
-    <header className="h-14 border-b border-border/50 bg-background/80 glass-effect flex items-center px-4 gap-4 z-30">
+    <header className="h-14 bg-background/80 glass-effect flex items-center px-4 gap-4 z-30 header-gradient-border">
       {/* Left: Mobile menu + Logo */}
       <div className="flex items-center gap-3">
         <Button
@@ -112,10 +122,14 @@ function HeaderBar({ onMobileMenuToggle, onCommandPaletteToggle }: { onMobileMen
           <Menu className="size-4" />
         </Button>
         <div className="flex items-center gap-2">
-          <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Bot className="size-4" />
-          </div>
-          <span className="font-semibold text-sm tracking-tight hidden sm:inline">
+          <motion.div
+            className="flex size-7 items-center justify-center rounded-md bg-gradient-to-br from-primary to-primary/80 shadow-sm"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Bot className="size-4 text-primary-foreground" />
+          </motion.div>
+          <span className="font-semibold text-sm tracking-tight hidden sm:inline gradient-text">
             AgentTeam
           </span>
         </div>
@@ -124,13 +138,13 @@ function HeaderBar({ onMobileMenuToggle, onCommandPaletteToggle }: { onMobileMen
       {/* Center: Search / Command Palette trigger */}
       <div className="flex-1 max-w-md mx-auto">
         <div
-          className="relative cursor-pointer"
+          className="relative cursor-pointer group"
           onClick={onCommandPaletteToggle}
         >
-          <div className="flex items-center h-8 w-full rounded-md border border-border/50 bg-muted/50 px-3 text-muted-foreground text-sm hover:bg-muted transition-colors">
-            <Search className="size-3.5 mr-2 shrink-0" />
+          <div className="flex items-center h-8 w-full rounded-md border border-border/50 bg-muted/50 px-3 text-muted-foreground text-sm hover:bg-muted/80 hover:border-border transition-all duration-200 group-hover:shadow-sm">
+            <Search className="size-3.5 mr-2 shrink-0 group-hover:text-primary/60 transition-colors" />
             <span className="flex-1">搜索...</span>
-            <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-border/50 bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+            <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-border/50 bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground group-hover:border-primary/30 transition-colors">
               <Command className="size-2.5" />K
             </kbd>
           </div>
@@ -144,10 +158,12 @@ function HeaderBar({ onMobileMenuToggle, onCommandPaletteToggle }: { onMobileMen
             <Button
               variant="ghost"
               size="icon"
-              className="size-8"
+              className="size-8 hover:bg-primary/10 transition-colors"
               onClick={() => setShowInspirationInput(true)}
             >
-              <Sparkles className="size-4 text-primary" />
+              <motion.div whileHover={{ rotate: 15 }} transition={{ type: 'spring', stiffness: 300 }}>
+                <Sparkles className="size-4 text-primary" />
+              </motion.div>
             </Button>
           </TooltipTrigger>
           <TooltipContent>
@@ -155,26 +171,16 @@ function HeaderBar({ onMobileMenuToggle, onCommandPaletteToggle }: { onMobileMen
           </TooltipContent>
         </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8 relative">
-              <Bell className="size-4" />
-              <span className="absolute top-1 right-1 size-1.5 rounded-full bg-primary" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>通知</p>
-          </TooltipContent>
-        </Tooltip>
+        <NotificationPanel />
 
         <ThemeToggle />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8 rounded-full">
-              <Avatar className="size-7">
+            <Button variant="ghost" size="icon" className="size-8 rounded-full hover:bg-accent/80 transition-colors">
+              <Avatar className="size-7 ring-1 ring-border/50">
                 <AvatarImage src="" alt="User" />
-                <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
                   U
                 </AvatarFallback>
               </Avatar>
@@ -224,20 +230,30 @@ function SidebarNav({
           return (
             <Tooltip key={navItem.id} delayDuration={collapsed ? 0 : 300}>
               <TooltipTrigger asChild>
-                <button
+                <motion.button
                   onClick={() => handleNavClick(navItem.id)}
                   className={`
                     w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium
-                    transition-all duration-150 relative
+                    transition-all duration-200 relative
                     ${
                       isActive
-                        ? 'bg-primary/10 text-primary border-l-2 border-l-primary'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground border-l-2 border-l-transparent'
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground hover:translate-x-0.5'
                     }
                     ${collapsed ? 'justify-center px-2' : ''}
                   `}
+                  whileHover={{ x: isActive ? 0 : 2 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <Icon className={`size-4 shrink-0 ${isActive ? 'text-primary' : ''}`} />
+                  {/* Active indicator */}
+                  {isActive && (
+                    <motion.div
+                      layoutId="sidebar-active-indicator"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary"
+                      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                    />
+                  )}
+                  <Icon className={`size-4 shrink-0 transition-colors ${isActive ? 'text-primary' : ''}`} />
                   {!collapsed && <span>{navItem.label}</span>}
                   {isActive && !collapsed && (
                     <motion.div
@@ -246,7 +262,7 @@ function SidebarNav({
                       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                     />
                   )}
-                </button>
+                </motion.button>
               </TooltipTrigger>
               {collapsed && (
                 <TooltipContent side="right">
@@ -262,16 +278,18 @@ function SidebarNav({
       <div className="px-2 pb-3 space-y-2">
         <Separator className="mb-2" />
 
-        {/* Daemon Status */}
+        {/* Daemon Status with glow */}
         <div
           className={`flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground ${collapsed ? 'justify-center' : ''}`}
         >
-          <span
+          <motion.span
             className={`size-2 rounded-full shrink-0 ${
               daemonOnline
-                ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]'
+                ? 'bg-emerald-500 pulse-glow'
                 : 'bg-red-500'
             }`}
+            animate={daemonOnline ? { scale: [1, 1.2, 1] } : {}}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
           />
           {!collapsed && <span>Daemon: {daemonOnline ? 'Online' : 'Offline'}</span>}
         </div>
@@ -279,12 +297,14 @@ function SidebarNav({
         {/* Quick Inspiration Button */}
         <Button
           variant="ghost"
-          className={`w-full gap-2 text-primary hover:text-primary hover:bg-primary/10 ${
+          className={`w-full gap-2 text-primary hover:text-primary hover:bg-primary/10 transition-all duration-200 ${
             collapsed ? 'justify-center px-2' : ''
           }`}
           onClick={() => setShowInspirationInput(true)}
         >
-          <Sparkles className="size-4 shrink-0" />
+          <motion.div whileHover={{ rotate: 15 }} transition={{ type: 'spring', stiffness: 300 }}>
+            <Sparkles className="size-4 shrink-0" />
+          </motion.div>
           {!collapsed && <span>表达想法</span>}
         </Button>
       </div>
@@ -296,22 +316,28 @@ function FooterBar() {
   const { daemonOnline } = useAppStore()
 
   return (
-    <footer className="h-8 border-t border-border/50 bg-background/80 glass-effect flex items-center justify-between px-4 text-xs text-muted-foreground z-30">
-      <div className="flex items-center gap-2">
-        <span
-          className={`size-1.5 rounded-full ${
-            daemonOnline
-              ? 'bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.5)]'
-              : 'bg-red-500'
-          }`}
-        />
-        <span>Daemon: {daemonOnline ? 'Online' : 'Offline'}</span>
+    <footer className="h-8 bg-background/80 glass-effect flex items-center justify-between px-4 text-xs text-muted-foreground z-30">
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <motion.span
+            className={`size-1.5 rounded-full ${
+              daemonOnline
+                ? 'bg-emerald-500'
+                : 'bg-red-500'
+            }`}
+            animate={daemonOnline ? { opacity: [1, 0.5, 1] } : {}}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <span>Daemon: {daemonOnline ? 'Online' : 'Offline'}</span>
+        </div>
+        <span className="text-border">|</span>
+        <span className="hidden sm:inline">系统运行中</span>
       </div>
       <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal">
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal border-primary/20 text-primary">
           MVP
         </Badge>
-        <span>AgentTeam v0.1.0</span>
+        <span className="font-medium">AgentTeam v0.1.0</span>
       </div>
     </footer>
   )
@@ -326,6 +352,7 @@ function ViewRenderer() {
     inspirations: <InspirationsView />,
     agents: <AgentsView />,
     monitor: <MonitorView />,
+    sessions: <SessionsView />,
     skills: <SkillsView />,
     settings: <SettingsView />,
   }
@@ -337,7 +364,7 @@ function ViewRenderer() {
         initial={{ opacity: 0, scale: 0.98, y: 6 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98, y: -6 }}
-        transition={{ duration: 0.18, ease: 'easeOut' }}
+        transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
         className="h-full overflow-auto"
       >
         {views[activeView]}
@@ -393,7 +420,7 @@ export function AppShell() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-7"
+                  className="size-7 hover:bg-accent/80 transition-colors"
                   onClick={toggleSidebar}
                 >
                   <motion.div
@@ -417,10 +444,10 @@ export function AppShell() {
           <SheetContent side="left" className="w-64 p-0">
             <SheetTitle className="sr-only">导航菜单</SheetTitle>
             <div className="h-14 flex items-center gap-2 px-4 border-b border-border/50">
-              <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                <Bot className="size-4" />
+              <div className="flex size-7 items-center justify-center rounded-md bg-gradient-to-br from-primary to-primary/80">
+                <Bot className="size-4 text-primary-foreground" />
               </div>
-              <span className="font-semibold text-sm">AgentTeam</span>
+              <span className="font-semibold text-sm gradient-text">AgentTeam</span>
             </div>
             <SidebarNav
               collapsed={false}

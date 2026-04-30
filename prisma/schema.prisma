@@ -32,7 +32,8 @@ model Member {
   daemonId     String? // 绑定的Daemon ID
   agentStatus  String? @default("offline") // "online" | "busy" | "offline"
   description  String? // Agent描述
-  systemPrompt String? // Agent系统提示词
+  systemPrompt  String?  // Agent系统提示词
+  autopilot     Boolean? @default(false) // Agent自动接单模式
 
   // 关系
   createdIssues    Issue[]    @relation("IssueCreator")

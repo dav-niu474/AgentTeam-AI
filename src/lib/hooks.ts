@@ -15,6 +15,7 @@ import {
   daemonsApi,
   auditLogsApi,
   memoryApi,
+  agentsApi,
   type MembersParams,
   type CreateMemberData,
   type UpdateMemberData,
@@ -38,6 +39,8 @@ import {
   type MemoryParams,
   type CreateMemoryData,
   type UpdateMemoryData,
+  type AutoAssignResult,
+  type ScanResult,
 } from '@/lib/api'
 
 // ============ Query Key Factory ============
@@ -230,6 +233,7 @@ export function useSessions(params?: SessionsParams) {
   return useQuery({
     queryKey: queryKeys.sessions(params),
     queryFn: () => sessionsApi.list(params),
+    refetchOnMount: 'always',
   })
 }
 
@@ -435,10 +439,39 @@ export function useDeleteMemory() {
   })
 }
 
+// ============ Agent Hooks (Auto-assign & Scan) ============
+
+export function useAutoAssign() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { issueId?: string; scene?: string; capabilities?: string[] }) =>
+      agentsApi.autoAssign(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['issues'] })
+      queryClient.invalidateQueries({ queryKey: ['members'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats })
+    },
+  })
+}
+
+export function useAgentScan() {
+  const queryClient = useQueryClient()
+  return useMutation<ScanResult, Error, void>({
+    mutationFn: () => agentsApi.scan(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['issues'] })
+      queryClient.invalidateQueries({ queryKey: ['inspirations'] })
+      queryClient.invalidateQueries({ queryKey: ['members'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats })
+      queryClient.invalidateQueries({ queryKey: ['auditLogs'] })
+    },
+  })
+}
+
 // ============ Compatibility Aliases ============
 
 // Re-export type aliases for board-view compatibility
-export type { IssueItem, MemberItem } from '@/lib/api'
+export type { IssueItem, MemberItem, AutoAssignResult, ScanResult } from '@/lib/api'
 
 /**
  * useChangeIssueStatus - Compatibility hook for board-view

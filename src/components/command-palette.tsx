@@ -22,6 +22,7 @@ import {
   ListTodo,
   Search,
   Lightbulb,
+  Terminal,
 } from 'lucide-react'
 import { useAppStore, type ActiveView } from '@/lib/store'
 import { useIssues, useAgents, useSkills, useInspirations } from '@/lib/hooks'
@@ -32,6 +33,7 @@ const NAV_ITEMS: { id: ActiveView; label: string; icon: React.ElementType; keywo
   { id: 'inspirations', label: 'Inspirations', icon: Lightbulb, keywords: ['灵感', 'inspiration'] },
   { id: 'agents', label: 'Agents', icon: Bot, keywords: ['代理', '智能体', 'agent'] },
   { id: 'monitor', label: 'Monitor', icon: Activity, keywords: ['监控', '日志', 'monitor'] },
+  { id: 'sessions', label: 'Sessions', icon: Terminal, keywords: ['会话', 'session', '终端'] },
   { id: 'skills', label: 'Skills', icon: Zap, keywords: ['技能', 'skill'] },
   { id: 'settings', label: 'Settings', icon: Settings, keywords: ['设置', 'setting'] },
 ]

@@ -324,7 +324,7 @@ async function registerWithPlatform() {
     host: 'localhost',
     port: PORT,
     status: 'online',
-    availableTools: JSON.stringify(toolNames),
+    availableTools: toolNames,
     lastHeartbeat: new Date().toISOString(),
   })
 
@@ -346,7 +346,7 @@ async function sendHeartbeat() {
 
   await callPlatform('PATCH', `/api/daemons/${daemonId}`, {
     status: 'online',
-    availableTools: JSON.stringify(toolNames),
+    availableTools: toolNames,
     lastHeartbeat: new Date().toISOString(),
   })
 

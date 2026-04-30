@@ -2,7 +2,9 @@
 
 import { create } from 'zustand'
 
-export type ActiveView = 'dashboard' | 'board' | 'inspirations' | 'agents' | 'monitor' | 'skills' | 'settings'
+export type ActiveView = 'dashboard' | 'board' | 'inspirations' | 'agents' | 'monitor' | 'sessions' | 'skills' | 'settings'
+
+export type BoardViewMode = 'kanban' | 'table'
 
 interface AppStore {
   // Navigation
@@ -24,6 +26,10 @@ interface AppStore {
   // Daemon status
   daemonOnline: boolean
   setDaemonOnline: (online: boolean) => void
+
+  // Board view mode
+  boardViewMode: BoardViewMode
+  setBoardViewMode: (mode: BoardViewMode) => void
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -46,4 +52,8 @@ export const useAppStore = create<AppStore>((set) => ({
   // Daemon status
   daemonOnline: true,
   setDaemonOnline: (online) => set({ daemonOnline: online }),
+
+  // Board view mode
+  boardViewMode: 'kanban',
+  setBoardViewMode: (mode) => set({ boardViewMode: mode }),
 }))

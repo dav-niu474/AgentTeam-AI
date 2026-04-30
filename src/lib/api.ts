@@ -18,6 +18,7 @@ export interface Member {
   agentStatus: string | null
   description: string | null
   systemPrompt: string | null
+  autopilot: boolean | null
   skills?: AgentSkillWithSkill[]
   createdIssues?: { id: string; title: string; status: string }[]
   assignedIssues?: { id: string; title: string; status: string }[]
@@ -102,8 +103,9 @@ export interface Session {
   context: string | null
   createdAt: string
   updatedAt: string
-  agent?: { id: string; name: string; type: string; avatar: string | null }
-  issue?: { id: string; title: string; status: string }
+  messageCount?: number
+  agent?: { id: string; name: string; type: string; avatar: string | null; agentStatus?: string | null }
+  issue?: { id: string; title: string; status: string; priority?: string; scene?: string | null }
 }
 
 export interface SessionDetail extends Session {
@@ -247,6 +249,7 @@ export interface CreateMemberData {
   agentStatus?: string
   description?: string
   systemPrompt?: string
+  autopilot?: boolean
 }
 
 export interface UpdateMemberData {
@@ -260,6 +263,7 @@ export interface UpdateMemberData {
   agentStatus?: string
   description?: string
   systemPrompt?: string
+  autopilot?: boolean
 }
 
 export const membersApi = {
@@ -567,12 +571,54 @@ export const memoryApi = {
     apiFetch<{ success: boolean }>(`/api/memory/${id}`, { method: 'DELETE' }),
 }
 
+// ============ Agents (Auto-assign & Scan) ============
+
+export interface AutoAssignResult {
+  recommended: {
+    id: string
+    name: string
+    agentStatus: string | null
+    capabilities: string[]
+    workload: number
+    autopilot: boolean
+    score: number
+  } | null
+  allCandidates: Array<{
+    id: string
+    name: string
+    agentStatus: string | null
+    workload: number
+    autopilot: boolean
+    score: number
+  }>
+}
+
+export interface ScanResult {
+  scanBy: { id: string; name: string }
+  scanSummary: string
+  createdIssues: Issue[]
+  staleIssueActions: Array<{ issueTitle: string; suggestedAction: string }>
+  recommendations: string[]
+}
+
+export const agentsApi = {
+  autoAssign: (data: { issueId?: string; scene?: string; capabilities?: string[] }) =>
+    apiFetch<AutoAssignResult>('/api/agents/auto-assign', { method: 'POST', body: JSON.stringify(data) }),
+  scan: () =>
+    apiFetch<ScanResult>('/api/agents/scan', { method: 'POST' }),
+}
+
 // ============ Helper: Parse JSON fields ============
 
 export function parseJsonField<T>(field: string | null, fallback: T): T {
   if (!field) return fallback
   try {
-    return JSON.parse(field) as T
+    let parsed: unknown = JSON.parse(field)
+    // Handle double-encoded JSON (e.g. '"[\"git\",\"node\"]"')
+    if (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed) } catch { /* keep original */ }
+    }
+    return parsed as T
   } catch {
     return fallback
   }

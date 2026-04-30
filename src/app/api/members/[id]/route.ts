@@ -81,6 +81,7 @@ export async function PATCH(
       agentStatus,
       description,
       systemPrompt,
+      autopilot,
     } = body;
 
     const updateData: Record<string, unknown> = {};
@@ -99,6 +100,7 @@ export async function PATCH(
       if (agentStatus !== undefined) updateData.agentStatus = agentStatus;
       if (description !== undefined) updateData.description = description;
       if (systemPrompt !== undefined) updateData.systemPrompt = systemPrompt;
+      if (autopilot !== undefined) updateData.autopilot = autopilot;
     }
 
     const member = await db.member.update({

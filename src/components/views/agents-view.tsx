@@ -36,20 +36,31 @@ import { toast } from 'sonner'
 // ============ Constants ============
 
 const CAPABILITY_OPTIONS = [
-  { value: 'code-gen', label: '代码生成', icon: Code2 },
-  { value: 'code-review', label: '代码审查', icon: FileCheck },
-  { value: 'fix-bug', label: 'Bug修复', icon: Wrench },
-  { value: 'add-feature', label: '功能开发', icon: GitBranch },
-  { value: 'doc', label: '文档', icon: FileText },
-  { value: 'analysis', label: '分析', icon: BarChart3 },
-  { value: 'testing', label: '测试', icon: TestTube2 },
-  { value: 'devops', label: 'DevOps', icon: Sparkles },
+  { value: 'code-gen', label: '代码生成', icon: Code2, gradient: 'from-emerald-500/15 to-teal-500/10' },
+  { value: 'code-review', label: '代码审查', icon: FileCheck, gradient: 'from-violet-500/15 to-purple-500/10' },
+  { value: 'fix-bug', label: 'Bug修复', icon: Wrench, gradient: 'from-red-500/15 to-orange-500/10' },
+  { value: 'add-feature', label: '功能开发', icon: GitBranch, gradient: 'from-teal-500/15 to-cyan-500/10' },
+  { value: 'doc', label: '文档', icon: FileText, gradient: 'from-amber-500/15 to-yellow-500/10' },
+  { value: 'analysis', label: '分析', icon: BarChart3, gradient: 'from-rose-500/15 to-pink-500/10' },
+  { value: 'testing', label: '测试', icon: TestTube2, gradient: 'from-lime-500/15 to-green-500/10' },
+  { value: 'devops', label: 'DevOps', icon: Sparkles, gradient: 'from-cyan-500/15 to-sky-500/10' },
 ] as const
 
+const AGENT_GROUP_GRADIENTS: Record<string, string> = {
+  dev: 'from-emerald-500/10 via-teal-500/5 to-transparent',
+  qa: 'from-violet-500/10 via-purple-500/5 to-transparent',
+  docs: 'from-amber-500/10 via-yellow-500/5 to-transparent',
+}
+
 const AVATAR_COLORS = [
-  'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500',
-  'bg-violet-500', 'bg-rose-500', 'bg-amber-500',
-  'bg-sky-500', 'bg-lime-500',
+  'from-emerald-500 to-teal-600',
+  'from-violet-500 to-purple-600',
+  'from-rose-500 to-pink-600',
+  'from-amber-500 to-orange-600',
+  'from-cyan-500 to-sky-600',
+  'from-lime-500 to-green-600',
+  'from-fuchsia-500 to-pink-600',
+  'from-teal-500 to-cyan-600',
 ]
 
 const DEFAULT_AGENTS = [
@@ -203,10 +214,10 @@ function RegisterAgentDialog({
                   <button
                     key={cap.value}
                     onClick={() => toggleCapability(cap.value)}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
                       isSelected
-                        ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
-                        : 'bg-muted text-muted-foreground hover:bg-accent'
+                        ? `bg-gradient-to-r ${cap.gradient} text-foreground ring-1 ring-primary/30 shadow-sm`
+                        : 'bg-muted text-muted-foreground hover:bg-accent hover:scale-105'
                     }`}
                   >
                     <cap.icon className="size-3" />
@@ -344,7 +355,7 @@ function AgentDetailSheet({
       <SheetContent className="sm:max-w-[480px] w-full overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-3">
-            <div className={`flex size-10 items-center justify-center rounded-full text-white font-semibold ${getAvatarColor(agent.name)}`}>
+            <div className={`flex size-10 items-center justify-center rounded-full text-white font-semibold bg-gradient-to-br ${getAvatarColor(agent.name)} shadow-md`}>
               {agent.name.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1">
@@ -358,7 +369,11 @@ function AgentDetailSheet({
                 <span>{agent.name}</span>
               )}
               <div className="flex items-center gap-2 mt-1">
-                <span className={`size-2 rounded-full ${getStatusColor(agent.agentStatus)}`} />
+                <motion.span
+                  className={`size-2 rounded-full ${getStatusColor(agent.agentStatus)}`}
+                  animate={agent.agentStatus === 'online' ? { scale: [1, 1.3, 1] } : {}}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                />
                 <span className="text-xs text-muted-foreground">{getStatusLabel(agent.agentStatus)}</span>
                 {agent.agentGroup && (
                   <Badge variant="outline" className="text-[10px] h-4 px-1.5">{agent.agentGroup}</Badge>
@@ -445,7 +460,7 @@ function AgentDetailSheet({
               {capabilities.length > 0 ? capabilities.map((cap) => {
                 const option = CAPABILITY_OPTIONS.find(c => c.value === cap)
                 return (
-                  <Badge key={cap} variant="secondary" className="text-xs gap-1">
+                  <Badge key={cap} variant="secondary" className={`text-xs gap-1 rounded-full bg-gradient-to-r ${option?.gradient || 'from-muted to-muted'} shadow-sm`}>
                     {option && <option.icon className="size-3" />}
                     {option?.label || cap}
                   </Badge>
@@ -482,7 +497,7 @@ function AgentDetailSheet({
                 placeholder="定义Agent的行为和角色..."
               />
             ) : (
-              <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground font-mono max-h-32 overflow-y-auto">
+              <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground font-mono max-h-32 overflow-y-auto border border-border/30">
                 {agent.systemPrompt || '暂无系统提示词'}
               </div>
             )}
@@ -498,11 +513,11 @@ function AgentDetailSheet({
                 {assignedIssues.slice(0, 5).map((issue) => (
                   <div
                     key={issue.id}
-                    className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm"
+                    className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm border border-border/30 hover:border-border/60 transition-colors"
                   >
                     <span className={`size-2 rounded-full ${
                       issue.status === 'in_progress' ? 'bg-amber-500' :
-                      issue.status === 'in_review' ? 'bg-blue-500' :
+                      issue.status === 'in_review' ? 'bg-teal-500' :
                       issue.status === 'resolved' ? 'bg-emerald-500' :
                       'bg-gray-400'
                     }`} />
@@ -526,7 +541,7 @@ function AgentDetailSheet({
                 {agentLogs.data.slice(0, 5).map((log) => (
                   <div
                     key={log.id}
-                    className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
+                    className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground border border-border/30"
                   >
                     <span className="text-[10px] opacity-60">
                       {new Date(log.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
@@ -605,7 +620,7 @@ export function AgentsView() {
           </h1>
           <p className="text-muted-foreground mt-1">管理和配置你的 AI Agent 团队成员</p>
         </div>
-        <Button className="gap-2" onClick={() => setRegisterOpen(true)}>
+        <Button className="gap-2 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5" onClick={() => setRegisterOpen(true)}>
           <Plus className="size-4" />
           注册 Agent
         </Button>
@@ -614,25 +629,34 @@ export function AgentsView() {
       {/* Agent Status Summary */}
       <div className="grid gap-4 md:grid-cols-3">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }}>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex size-10 items-center justify-center rounded-full bg-emerald-500/10">
+          <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 dark:hover:border-emerald-600">
+            <CardContent className="flex items-center gap-3 p-4 relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent" />
+              <div className="flex size-10 items-center justify-center rounded-full bg-emerald-500/10 relative">
                 <Wifi className="size-5 text-emerald-500" />
               </div>
-              <div>
+              <div className="relative">
                 <p className="text-2xl font-bold">{isLoading ? <Skeleton className="h-8 w-8" /> : statusCounts.online}</p>
                 <p className="text-xs text-muted-foreground">在线</p>
               </div>
+              {statusCounts.online > 0 && (
+                <motion.div
+                  className="ml-auto size-2 rounded-full bg-emerald-500"
+                  animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+              )}
             </CardContent>
           </Card>
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex size-10 items-center justify-center rounded-full bg-amber-500/10">
+          <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-amber-300 dark:hover:border-amber-600">
+            <CardContent className="flex items-center gap-3 p-4 relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent" />
+              <div className="flex size-10 items-center justify-center rounded-full bg-amber-500/10 relative">
                 <Clock className="size-5 text-amber-500" />
               </div>
-              <div>
+              <div className="relative">
                 <p className="text-2xl font-bold">{isLoading ? <Skeleton className="h-8 w-8" /> : statusCounts.busy}</p>
                 <p className="text-xs text-muted-foreground">忙碌</p>
               </div>
@@ -640,7 +664,7 @@ export function AgentsView() {
           </Card>
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card>
+          <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
             <CardContent className="flex items-center gap-3 p-4">
               <div className="flex size-10 items-center justify-center rounded-full bg-muted">
                 <WifiOff className="size-5 text-muted-foreground" />
@@ -658,7 +682,7 @@ export function AgentsView() {
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i}>
+            <Card key={i} className="shimmer">
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
                   <Skeleton className="size-12 rounded-full" />
@@ -677,6 +701,7 @@ export function AgentsView() {
           <AnimatePresence>
             {agents.map((agent, i) => {
               const caps = parseJsonField<string[]>(agent.capabilities, [])
+              const groupGradient = AGENT_GROUP_GRADIENTS[agent.agentGroup || ''] || 'from-primary/5 via-primary/3 to-transparent'
               return (
                 <motion.div
                   key={agent.id}
@@ -685,11 +710,16 @@ export function AgentsView() {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ delay: i * 0.05 }}
                 >
-                  <Card className="group hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleViewDetails(agent)}>
-                    <CardContent className="p-6">
+                  <Card
+                    className="group hover:shadow-lg transition-all duration-300 cursor-pointer hover:-translate-y-1 overflow-hidden relative hover:border-primary/30"
+                    onClick={() => handleViewDetails(agent)}
+                  >
+                    {/* Group-based gradient background */}
+                    <div className={`absolute inset-0 bg-gradient-to-br ${groupGradient} opacity-60 group-hover:opacity-100 transition-opacity duration-300`} />
+                    <CardContent className="p-6 relative">
                       <div className="flex items-start gap-4">
-                        {/* Avatar */}
-                        <div className={`flex size-12 items-center justify-center rounded-full text-white font-semibold shrink-0 ${getAvatarColor(agent.name)}`}>
+                        {/* Avatar with gradient */}
+                        <div className={`flex size-12 items-center justify-center rounded-full text-white font-semibold shrink-0 bg-gradient-to-br ${getAvatarColor(agent.name)} shadow-md group-hover:shadow-lg transition-shadow`}>
                           {agent.name.charAt(0).toUpperCase()}
                         </div>
 
@@ -697,7 +727,11 @@ export function AgentsView() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold text-sm truncate">{agent.name}</h3>
-                            <span className={`size-2 rounded-full shrink-0 ${getStatusColor(agent.agentStatus)}`} />
+                            <motion.span
+                              className={`size-2 rounded-full shrink-0 ${getStatusColor(agent.agentStatus)}`}
+                              animate={agent.agentStatus === 'online' ? { scale: [1, 1.3, 1] } : {}}
+                              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                            />
                           </div>
 
                           <p className="text-xs text-muted-foreground mt-0.5">
@@ -705,18 +739,18 @@ export function AgentsView() {
                             {agent.agentGroup && ` · ${agent.agentGroup}`}
                           </p>
 
-                          {/* Capabilities */}
+                          {/* Capabilities - pill style */}
                           <div className="flex flex-wrap gap-1 mt-2">
                             {caps.slice(0, 3).map((cap) => {
                               const option = CAPABILITY_OPTIONS.find(c => c.value === cap)
                               return (
-                                <Badge key={cap} variant="secondary" className="text-[10px] h-5 px-1.5 gap-0.5">
+                                <Badge key={cap} variant="secondary" className={`text-[10px] h-5 px-2 gap-0.5 rounded-full bg-gradient-to-r ${option?.gradient || 'from-muted to-muted'}`}>
                                   {option?.label || cap}
                                 </Badge>
                               )
                             })}
                             {caps.length > 3 && (
-                              <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 rounded-full">
                                 +{caps.length - 3}
                               </Badge>
                             )}
@@ -735,7 +769,7 @@ export function AgentsView() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity gap-1.5 text-xs"
+                          className="opacity-0 group-hover:opacity-100 transition-all duration-200 gap-1.5 text-xs hover:text-primary"
                           onClick={(e) => { e.stopPropagation(); handleViewDetails(agent) }}
                         >
                           <Eye className="size-3.5" />

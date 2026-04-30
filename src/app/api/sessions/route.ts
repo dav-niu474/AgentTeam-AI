@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
-// GET /api/sessions - List sessions, filter by ?agentId=xxx&issueId=xxx
+// GET /api/sessions - List sessions, filter by ?agentId=xxx&issueId=xxx&status=xxx
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -18,16 +18,31 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         agent: {
-          select: { id: true, name: true, type: true, avatar: true },
+          select: { id: true, name: true, type: true, avatar: true, agentStatus: true },
         },
         issue: {
-          select: { id: true, title: true, status: true },
+          select: { id: true, title: true, status: true, priority: true, scene: true },
         },
       },
       orderBy: { updatedAt: 'desc' },
     });
 
-    return NextResponse.json(sessions);
+    // Add message count by parsing messages JSON
+    const sessionsWithCount = sessions.map((session) => {
+      let messageCount = 0;
+      try {
+        const msgs = JSON.parse(session.messages || '[]');
+        messageCount = Array.isArray(msgs) ? msgs.length : 0;
+      } catch {
+        messageCount = 0;
+      }
+      return {
+        ...session,
+        messageCount,
+      };
+    });
+
+    return NextResponse.json(sessionsWithCount);
   } catch (error) {
     console.error('Failed to list sessions:', error);
     return NextResponse.json(

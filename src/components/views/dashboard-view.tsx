@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { formatDistanceToNow, isToday, isYesterday, subDays } from 'date-fns'
+import { formatDistanceToNow, isToday, isYesterday } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import {
   LayoutDashboard,
@@ -23,6 +23,13 @@ import {
   Zap,
   ChevronRight,
   PlusCircle,
+  Sun,
+  Moon,
+  CloudSun,
+  Radar,
+  ScanSearch,
+  Eye,
+  ListChecks,
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { Button } from '@/components/ui/button'
@@ -183,7 +190,79 @@ function Sparkline({ data, color = '#10b981', width = 80, height = 28 }: { data:
   )
 }
 
+// ============ Progress Ring Component ============
+
+function ProgressRing({ value, size = 48, strokeWidth = 4 }: { value: number; size?: number; strokeWidth?: number }) {
+  const radius = (size - strokeWidth) / 2
+  const circumference = radius * 2 * Math.PI
+  const offset = circumference - (value / 100) * circumference
+
+  return (
+    <svg width={size} height={size} className="transform -rotate-90">
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={strokeWidth}
+        className="text-muted/50"
+      />
+      <motion.circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="url(#progress-gradient)"
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        initial={{ strokeDashoffset: circumference }}
+        animate={{ strokeDashoffset: offset }}
+        transition={{ duration: 1, ease: 'easeOut' }}
+      />
+      <defs>
+        <linearGradient id="progress-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#10b981" />
+          <stop offset="100%" stopColor="#34d399" />
+        </linearGradient>
+      </defs>
+    </svg>
+  )
+}
+
+// ============ Time Greeting ============
+
+function useTimeGreeting() {
+  const hour = new Date().getHours()
+  if (hour < 6) {
+    return { text: '夜深了', icon: Moon }
+  } else if (hour < 12) {
+    return { text: '早上好', icon: Sun }
+  } else if (hour < 18) {
+    return { text: '下午好', icon: CloudSun }
+  } else {
+    return { text: '晚上好', icon: Moon }
+  }
+}
+
 // ============ Animated Stat Card ============
+
+const STAT_GRADIENTS = [
+  'from-slate-500/10 via-slate-500/5 to-transparent',
+  'from-emerald-500/10 via-emerald-500/5 to-transparent',
+  'from-purple-500/10 via-purple-500/5 to-transparent',
+  'from-green-500/10 via-green-500/5 to-transparent',
+  'from-teal-500/10 via-teal-500/5 to-transparent',
+]
+
+const STAT_BORDERS = [
+  'hover:border-slate-300 dark:hover:border-slate-600',
+  'hover:border-emerald-300 dark:hover:border-emerald-600',
+  'hover:border-purple-300 dark:hover:border-purple-600',
+  'hover:border-green-300 dark:hover:border-green-600',
+  'hover:border-teal-300 dark:hover:border-teal-600',
+]
 
 function AnimatedStatCard({
   title,
@@ -193,6 +272,8 @@ function AnimatedStatCard({
   iconColor,
   sparkData,
   sparkColor,
+  gradientIndex = 0,
+  progressRing,
 }: {
   title: string
   value: number
@@ -201,33 +282,51 @@ function AnimatedStatCard({
   iconColor?: string
   sparkData?: number[]
   sparkColor?: string
+  gradientIndex?: number
+  progressRing?: number
 }) {
   const animatedValue = useCountUp(value)
+  const gradient = STAT_GRADIENTS[gradientIndex % STAT_GRADIENTS.length]
+  const borderHover = STAT_BORDERS[gradientIndex % STAT_BORDERS.length]
 
   return (
-    <Card className="hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 group">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className={`size-4 ${iconColor || 'text-muted-foreground'} transition-transform group-hover:scale-110`} />
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-end justify-between">
-          <div>
-            <div className="text-2xl font-bold tabular-nums">{animatedValue}</div>
-            <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+    <Card className={`hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden ${borderHover}`}>
+      {/* Gradient background - always visible subtly, stronger on hover */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} group-hover:opacity-100 opacity-60 transition-opacity duration-500`} />
+      <div className="relative">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          <div className={`flex size-7 items-center justify-center rounded-md ${iconColor ? `${iconColor.replace('text-', 'bg-').replace('500', '500/10')}` : 'bg-muted'}`}>
+            <Icon className={`size-3.5 ${iconColor || 'text-muted-foreground'} transition-transform group-hover:scale-110`} />
           </div>
-          {sparkData && sparkData.length > 1 && (
-            <Sparkline data={sparkData} color={sparkColor || '#10b981'} />
-          )}
-        </div>
-      </CardContent>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-end justify-between">
+            <div>
+              <div className="text-2xl font-bold tabular-nums">{animatedValue}{progressRing !== undefined ? '%' : ''}</div>
+              <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+            </div>
+            {progressRing !== undefined && (
+              <div className="relative">
+                <ProgressRing value={progressRing} />
+                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                  {progressRing}
+                </span>
+              </div>
+            )}
+            {sparkData && sparkData.length > 1 && !progressRing && progressRing === undefined && (
+              <Sparkline data={sparkData} color={sparkColor || '#10b981'} />
+            )}
+          </div>
+        </CardContent>
+      </div>
     </Card>
   )
 }
 
 function StatsCardSkeleton() {
   return (
-    <Card>
+    <Card className="shimmer">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <Skeleton className="h-4 w-20" />
         <Skeleton className="size-4 rounded" />
@@ -242,17 +341,28 @@ function StatsCardSkeleton() {
 
 // ============ Pipeline Stage ============
 
-function PipelineStage({ label, count, color, isLast }: { label: string; count: number; color: string; isLast?: boolean }) {
+function PipelineStage({ label, count, color, isLast, icon: Icon }: { label: string; count: number; color: string; isLast?: boolean; icon?: React.ElementType }) {
   return (
     <div className="flex items-center gap-0">
-      <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${color} min-w-[100px] justify-center`}>
+      <motion.div
+        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border ${color} min-w-[100px] justify-center`}
+        whileHover={{ scale: 1.02, y: -1 }}
+        transition={{ duration: 0.15 }}
+      >
+        {Icon && <Icon className="size-3.5 opacity-60" />}
         <span className="text-sm font-medium">{label}</span>
         <Badge variant="secondary" className="text-xs h-5 min-w-[20px] justify-center font-bold">
           {count}
         </Badge>
-      </div>
+      </motion.div>
       {!isLast && (
-        <ChevronRight className="size-5 text-muted-foreground/50 mx-1 shrink-0" />
+        <motion.div
+          initial={{ opacity: 0, x: -4 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3, duration: 0.3 }}
+        >
+          <ChevronRight className="size-5 text-muted-foreground/50 mx-0.5 shrink-0" />
+        </motion.div>
       )}
     </div>
   )
@@ -299,6 +409,43 @@ export function DashboardView() {
   const { data: inspirations } = useInspirations()
   const queryClient = useQueryClient()
   const [seeding, setSeeding] = useState(false)
+  const [scanResult, setScanResult] = useState<{
+    scanBy: { name: string }
+    createdIssues: { id: string; title: string; priority: string }[]
+    scanSummary?: string
+    recommendations: string[]
+  } | null>(null)
+  const [agentScanning, setAgentScanning] = useState(false)
+  const greeting = useTimeGreeting()
+  const GreetingIcon = greeting.icon
+
+  const handleAgentScan = async () => {
+    setAgentScanning(true)
+    try {
+      const res = await fetch('/api/agents/scan', { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Scan failed' }))
+        throw new Error(err.error || 'Scan failed')
+      }
+      const result = await res.json()
+      await queryClient.invalidateQueries()
+      setScanResult({
+        scanBy: { name: result.scanBy?.name || 'Agent' },
+        createdIssues: (result.createdIssues || []).map((i: { id: string; title: string; priority: string }) => ({ id: i.id, title: i.title, priority: i.priority })),
+        scanSummary: result.scanSummary || '扫描完成',
+        recommendations: result.recommendations || [],
+      })
+      if ((result.createdIssues || []).length > 0) {
+        toast.success(`${result.scanBy?.name || 'Agent'} 扫描完成，创建了 ${(result.createdIssues || []).length} 个新任务！`)
+      } else {
+        toast.success(`${result.scanBy?.name || 'Agent'} 扫描完成，未发现需要新建的任务`)
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Agent 扫描失败')
+    } finally {
+      setAgentScanning(false)
+    }
+  }
 
   const handleSeed = async () => {
     setSeeding(true)
@@ -364,26 +511,37 @@ export function DashboardView() {
       variants={container}
       initial="hidden"
       animate="show"
-      className="space-y-6 p-4 md:p-6"
+      className="space-y-6 p-4 md:p-6 bg-pattern-dots min-h-full"
     >
-      {/* Header */}
+      {/* Header with greeting */}
       <motion.div variants={item}>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <LayoutDashboard className="size-6 text-primary" />
-          Dashboard
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          欢迎回来！这里是你的工作总览
-        </p>
+        <div className="flex items-center gap-2">
+          <motion.div
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+            className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5"
+          >
+            <GreetingIcon className="size-5 text-primary" />
+          </motion.div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              <span className="gradient-text">{greeting.text}</span>！
+            </h1>
+            <p className="text-muted-foreground mt-0.5">
+              这里是你的工作总览
+            </p>
+          </div>
+        </div>
       </motion.div>
 
       {/* Empty State CTA - Show when no agents exist */}
       {hasNoAgents && !statsLoading && (
         <motion.div variants={item}>
-          <Card className="border-primary/30 bg-primary/5 overflow-hidden">
-            <CardContent className="pt-6 pb-6">
+          <Card className="border-primary/30 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 overflow-hidden card-flowing-gradient">
+            <CardContent className="pt-6 pb-6 relative">
               <div className="flex flex-col sm:flex-row items-center gap-6">
-                <div className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 shrink-0">
+                <div className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 shrink-0 glow-emerald">
                   <Users className="size-8 text-primary" />
                 </div>
                 <div className="flex-1 text-center sm:text-left">
@@ -393,7 +551,7 @@ export function DashboardView() {
                   </p>
                 </div>
                 <Button
-                  className="gap-2 shrink-0"
+                  className="gap-2 shrink-0 shadow-md hover:shadow-lg transition-shadow"
                   onClick={handleSeed}
                   disabled={seeding}
                 >
@@ -428,8 +586,10 @@ export function DashboardView() {
                     : '暂无任务'
                 }
                 icon={ListTodo}
+                iconColor="text-slate-500"
                 sparkData={sparkDataTotal}
                 sparkColor="#94a3b8"
+                gradientIndex={0}
               />
             </motion.div>
 
@@ -446,6 +606,7 @@ export function DashboardView() {
                 iconColor="text-emerald-500"
                 sparkData={sparkDataProgress}
                 sparkColor="#10b981"
+                gradientIndex={1}
               />
             </motion.div>
 
@@ -457,7 +618,7 @@ export function DashboardView() {
                   stats?.agents.total ? (
                     <span className="flex items-center gap-2">
                       <span className="flex items-center gap-1">
-                        <span className="size-1.5 rounded-full bg-emerald-500" />
+                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         {stats.agents.byStatus.online}
                       </span>
                       <span className="flex items-center gap-1">
@@ -472,8 +633,10 @@ export function DashboardView() {
                   ) : '暂无 Agent'
                 }
                 icon={Bot}
+                iconColor="text-purple-500"
                 sparkData={sparkDataAgents}
-                sparkColor="#6366f1"
+                sparkColor="#8b5cf6"
+                gradientIndex={2}
               />
             </motion.div>
 
@@ -488,6 +651,8 @@ export function DashboardView() {
                 iconColor="text-green-500"
                 sparkData={sparkDataRate}
                 sparkColor="#22c55e"
+                gradientIndex={3}
+                progressRing={completionRate}
               />
             </motion.div>
 
@@ -504,6 +669,7 @@ export function DashboardView() {
                 iconColor="text-primary"
                 sparkData={sparkDataInsp}
                 sparkColor="#10b981"
+                gradientIndex={4}
               />
             </motion.div>
           </>
@@ -512,29 +678,32 @@ export function DashboardView() {
 
       {/* Inspiration Pipeline */}
       <motion.div variants={item}>
-        <Card>
-          <CardHeader className="pb-3">
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-3 bg-gradient-to-r from-primary/5 to-transparent">
             <CardTitle className="text-lg flex items-center gap-2">
               <Sparkles className="size-5 text-primary" />
               灵感管线
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-center gap-0 flex-wrap">
+            <div className="flex items-center justify-center gap-0 flex-wrap py-2">
               <PipelineStage
                 label="灵感"
                 count={pipelineData.pending}
                 color="border-amber-500/30 bg-amber-500/5"
+                icon={Lightbulb}
               />
               <PipelineStage
                 label="分析中"
                 count={pipelineData.analyzing}
-                color="border-blue-500/30 bg-blue-500/5"
+                color="border-teal-500/30 bg-teal-500/5"
+                icon={Activity}
               />
               <PipelineStage
                 label="已转化"
                 count={pipelineData.converted}
                 color="border-emerald-500/30 bg-emerald-500/5"
+                icon={CheckCircle2}
                 isLast
               />
             </div>
@@ -637,12 +806,18 @@ export function DashboardView() {
             </CardHeader>
             <CardContent>
               {agents && agents.length > 0 ? (
-                <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {agents.slice(0, 6).map((agent) => (
-                    <div key={agent.id} className="flex items-center gap-3 p-1.5 rounded-md hover:bg-muted/50 transition-colors">
-                      <Avatar className="size-8">
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {agents.slice(0, 6).map((agent, idx) => (
+                    <motion.div
+                      key={agent.id}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-all duration-200 hover:translate-x-0.5"
+                    >
+                      <Avatar className="size-8 ring-1 ring-border/30">
                         <AvatarImage src={agent.avatar || undefined} alt={agent.name} />
-                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                        <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
                           {agent.name.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -665,7 +840,7 @@ export function DashboardView() {
                         <span
                           className={`size-1.5 rounded-full mr-1 ${
                             agent.agentStatus === 'online'
-                              ? 'bg-emerald-500'
+                              ? 'bg-emerald-500 animate-pulse'
                               : agent.agentStatus === 'busy'
                                 ? 'bg-amber-500'
                                 : 'bg-gray-400'
@@ -673,7 +848,7 @@ export function DashboardView() {
                         />
                         {agent.agentStatus === 'online' ? '在线' : agent.agentStatus === 'busy' ? '忙碌' : '离线'}
                       </Badge>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               ) : (
@@ -767,10 +942,10 @@ export function DashboardView() {
           <CardHeader>
             <CardTitle className="text-lg">快速操作</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+          <CardContent className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <Button
               variant="outline"
-              className="justify-start gap-2 h-auto py-3 hover:-translate-y-0.5 transition-all"
+              className="justify-start gap-2 h-auto py-3 hover:-translate-y-0.5 transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
               onClick={() => setShowInspirationInput(true)}
             >
               <Sparkles className="size-4 text-primary" />
@@ -779,7 +954,7 @@ export function DashboardView() {
             </Button>
             <Button
               variant="outline"
-              className="justify-start gap-2 h-auto py-3 hover:-translate-y-0.5 transition-all"
+              className="justify-start gap-2 h-auto py-3 hover:-translate-y-0.5 transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
               onClick={() => setActiveView('board')}
             >
               <ListTodo className="size-4" />
@@ -788,20 +963,140 @@ export function DashboardView() {
             </Button>
             <Button
               variant="outline"
-              className="justify-start gap-2 h-auto py-3 hover:-translate-y-0.5 transition-all"
+              className="justify-start gap-2 h-auto py-3 hover:-translate-y-0.5 transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
               onClick={() => setActiveView('agents')}
             >
               <Bot className="size-4" />
               <span>查看 Agent</span>
               <ArrowRight className="size-3 ml-auto" />
             </Button>
+            <Button
+              variant="outline"
+              className="justify-start gap-2 h-auto py-3 hover:-translate-y-0.5 transition-all hover:border-orange-500/30 hover:bg-orange-500/5 hover:text-orange-600"
+              onClick={handleAgentScan}
+              disabled={agentScanning}
+            >
+              <Radar className={`size-4 ${agentScanning ? 'animate-spin' : 'text-orange-500'}`} />
+              <span>{agentScanning ? '扫描中...' : '触发 Agent 扫描'}</span>
+            </Button>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Agent Activity Feed */}
+      <motion.div variants={item}>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Radar className="size-5 text-orange-500" />
+              Agent 活动
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs gap-1.5"
+              onClick={handleAgentScan}
+              disabled={agentScanning}
+            >
+              <ScanSearch className={`size-3.5 ${agentScanning ? 'animate-spin' : ''}`} />
+              {agentScanning ? '扫描中...' : '触发扫描'}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {/* Scan Result */}
+            {scanResult && (
+              <div className="mb-4 rounded-lg border border-orange-500/20 bg-orange-500/5 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Bot className="size-4 text-orange-500" />
+                  <span>{scanResult.scanBy.name} 完成扫描</span>
+                  <Badge variant="outline" className="text-[10px] h-5 ml-auto">
+                    创建了 {scanResult.createdIssues.length} 个任务
+                  </Badge>
+                </div>
+                {scanResult.scanSummary && (
+                  <p className="text-xs text-muted-foreground">{scanResult.scanSummary}</p>
+                )}
+                {scanResult.createdIssues.length > 0 && (
+                  <div className="space-y-1 mt-2">
+                    {scanResult.createdIssues.map((issue) => (
+                      <div key={issue.id} className="flex items-center gap-2 text-xs rounded-md bg-background/80 px-2 py-1.5">
+                        <ListChecks className="size-3 text-orange-500" />
+                        <span className="font-medium truncate">{issue.title}</span>
+                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5 ml-auto">
+                          {issue.priority}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {scanResult.recommendations.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-[10px] font-medium text-muted-foreground mb-1">建议</p>
+                    <ul className="text-xs text-muted-foreground space-y-0.5">
+                      {scanResult.recommendations.slice(0, 3).map((rec, i) => (
+                        <li key={i} className="flex items-start gap-1">
+                          <span className="text-orange-500 shrink-0">•</span>
+                          {rec}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Agent-driven activity log */}
+            {(() => {
+              const agentLogs = recentLogs.filter(l => l.actorType === 'agent')
+              if (agentLogs.length === 0) {
+                return (
+                  <div className="flex items-center justify-center py-8 text-muted-foreground">
+                    <div className="text-center">
+                      <Radar className="size-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">暂无 Agent 活动记录</p>
+                      <p className="text-xs mt-1">Agent 分析灵感或扫描项目时，活动会显示在这里</p>
+                    </div>
+                  </div>
+                )
+              }
+              return (
+                <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {agentLogs.map((log) => {
+                    const Icon = ACTION_ICONS[log.action] || Radar
+                    const colorClass = ACTION_COLORS[log.action] || 'text-muted-foreground'
+                    const borderColor = ACTION_BORDER_COLORS[log.action] || 'border-l-muted-foreground'
+                    return (
+                      <div
+                        key={log.id}
+                        className={`flex items-start gap-3 py-1.5 px-2 rounded-md border-l-2 ${borderColor} hover:bg-muted/30 transition-colors`}
+                      >
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="size-1.5 rounded-full bg-orange-500" />
+                          <Bot className="size-3 text-orange-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs">
+                            <span className="font-medium text-orange-600 dark:text-orange-400">{log.actor?.name || 'Agent'}</span>
+                            <span className="text-muted-foreground"> {formatActionLabel(log.action, log.details)}</span>
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true, locale: zhCN })}
+                          </p>
+                        </div>
+                        <Icon className={`size-3.5 shrink-0 mt-0.5 ${colorClass}`} />
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
           </CardContent>
         </Card>
       </motion.div>
 
       {/* System Status */}
       <motion.div variants={item}>
-        <Card>
+        <Card className="bg-gradient-to-r from-muted/30 to-transparent">
           <CardContent className="pt-6">
             <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">

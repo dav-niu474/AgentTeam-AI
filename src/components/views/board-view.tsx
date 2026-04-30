@@ -44,6 +44,12 @@ import {
   BarChart3,
   Eye,
   Play,
+  Inbox,
+  CircleDot,
+  CheckCheck,
+  CircleCheck,
+  List,
+  ArrowUpDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -53,6 +59,15 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
+import { Checkbox as UICheckbox } from '@/components/ui/checkbox'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -90,7 +105,7 @@ import {
   useDeleteIssue,
 } from '@/lib/hooks'
 import { useCurrentUser } from '@/lib/use-current-user'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, type BoardViewMode } from '@/lib/store'
 import { parseJsonField } from '@/lib/api'
 import type { Issue, Member } from '@/lib/api'
 import { toast } from 'sonner'
@@ -118,16 +133,16 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 }
 
 const COLUMN_CONFIG = [
-  { id: 'open', label: '待处理', color: 'bg-slate-400', accent: 'border-t-slate-400', wipLimit: 10 },
-  { id: 'in_progress', label: '进行中', color: 'bg-emerald-500', accent: 'border-t-emerald-500', wipLimit: 5 },
-  { id: 'in_review', label: '待审查', color: 'bg-amber-500', accent: 'border-t-amber-500', wipLimit: 5 },
-  { id: 'resolved', label: '已解决', color: 'bg-green-500', accent: 'border-t-green-500', wipLimit: 20 },
+  { id: 'open', label: '待处理', color: 'bg-slate-400', accent: 'border-t-slate-400', icon: Inbox, bgPattern: 'bg-pattern-dots', wipLimit: 10 },
+  { id: 'in_progress', label: '进行中', color: 'bg-emerald-500', accent: 'border-t-emerald-500', icon: CircleDot, bgPattern: 'bg-pattern-grid', wipLimit: 5 },
+  { id: 'in_review', label: '待审查', color: 'bg-amber-500', accent: 'border-t-amber-500', icon: Eye, bgPattern: 'bg-pattern-dots', wipLimit: 5 },
+  { id: 'resolved', label: '已解决', color: 'bg-green-500', accent: 'border-t-green-500', icon: CircleCheck, bgPattern: 'bg-pattern-grid', wipLimit: 20 },
 ]
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon?: React.ElementType }> = {
   urgent: { label: '紧急', color: 'text-red-600', bg: 'bg-red-500/10 border-red-500/30', border: 'border-l-red-500' },
   high: { label: '高', color: 'text-orange-600', bg: 'bg-orange-500/10 border-orange-500/30', border: 'border-l-orange-500' },
-  medium: { label: '中', color: 'text-blue-600', bg: 'bg-blue-500/10 border-blue-500/30', border: 'border-l-blue-500' },
+  medium: { label: '中', color: 'text-teal-600', bg: 'bg-teal-500/10 border-teal-500/30', border: 'border-l-teal-500' },
   low: { label: '低', color: 'text-gray-500', bg: 'bg-gray-500/10 border-gray-500/30', border: 'border-l-gray-400' },
 }
 
@@ -171,13 +186,13 @@ function IssueCard({ issue, onClick, onQuickAction }: { issue: Issue; onClick: (
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
       <Card
-        className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 border-t-2 border-l-[3px] ${priority.border} ${COLUMN_CONFIG.find(c => c.id === issue.status)?.accent || ''} ${isDragging ? 'shadow-lg ring-2 ring-primary/20' : ''} group relative`}
+        className={`cursor-pointer transition-all duration-200 border-t-2 border-l-[3px] ${priority.border} ${COLUMN_CONFIG.find(c => c.id === issue.status)?.accent || ''} ${isDragging ? 'shadow-lg ring-2 ring-primary/20' : 'hover:shadow-md hover:-translate-y-0.5'} group relative hover:border-l-primary/50`}
         onClick={onClick}
       >
         <CardContent className="p-3 space-y-2">
           {/* Drag handle + Title */}
           <div className="flex items-start gap-1.5">
-            <button {...listeners} className="mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground">
+            <button {...listeners} className="mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground transition-colors">
               <GripVertical className="size-3.5" />
             </button>
             {SceneIcon && <SceneIcon className="size-3.5 mt-0.5 text-muted-foreground/60 shrink-0" />}
@@ -205,9 +220,9 @@ function IssueCard({ issue, onClick, onQuickAction }: { issue: Issue; onClick: (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               {issue.assignee ? (
-                <Avatar className="size-5">
+                <Avatar className="size-5 ring-1 ring-border/30">
                   <AvatarImage src={issue.assignee.avatar || undefined} />
-                  <AvatarFallback className={`text-[8px] ${issue.assignee.type === 'agent' ? 'bg-primary/10 text-primary' : 'bg-blue-500/10 text-blue-600'}`}>
+                  <AvatarFallback className={`text-[8px] ${issue.assignee.type === 'agent' ? 'bg-primary/10 text-primary' : 'bg-teal-500/10 text-teal-600'}`}>
                     {issue.assignee.type === 'agent' ? <Bot className="size-2.5" /> : issue.assignee.name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -284,11 +299,14 @@ function KanbanColumn({
   onQuickAction: (issue: Issue, action: string) => void
 }) {
   const isOverWip = issues.length > config.wipLimit
+  const ColumnIcon = config.icon
 
   return (
-    <div className="flex flex-col rounded-lg border border-border/50 bg-muted/20 min-w-[280px] md:min-w-0">
+    <div className={`flex flex-col rounded-lg border border-border/50 bg-muted/20 min-w-[280px] md:min-w-0 overflow-hidden`}>
       <div className={`flex items-center gap-2 p-3 border-b border-border/50 border-t-2 ${config.accent}`}>
-        <span className={`size-2.5 rounded-full ${config.color}`} />
+        <div className={`flex size-6 items-center justify-center rounded-md ${config.color.replace('bg-', 'bg-').replace('-400', '-500/10').replace('-500', '-500/10')}`}>
+          <ColumnIcon className={`size-3.5 ${config.color.replace('bg-', 'text-')}`} />
+        </div>
         <span className="text-sm font-medium">{config.label}</span>
         <Badge
           variant={isOverWip ? 'destructive' : 'secondary'}
@@ -303,7 +321,7 @@ function KanbanColumn({
         )}
       </div>
       <SortableContext items={issues.map(i => i.id)} strategy={verticalListSortingStrategy}>
-        <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-240px)]">
+        <div className={`flex-1 p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-240px)] ${config.bgPattern}`}>
           {issues.length > 0 ? (
             issues.map((issue) => (
               <IssueCard
@@ -592,14 +610,14 @@ function IssueDetailSheet({
         {/* Execute Task Button */}
         {issue.assigneeId && (issue.status === 'in_progress' || issue.status === 'open' || issue.status === 'triaged') && (
           <Button
-            className="w-full gap-2 mb-4 py-5 text-base"
+            className="w-full gap-2 mb-4 py-5 text-base bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-md hover:shadow-lg transition-all"
             onClick={handleExecuteTask}
             disabled={executing}
           >
             {executing ? (
               <Loader2 className="size-5 animate-spin" />
             ) : (
-              <span>🚀</span>
+              <Zap className="size-5" />
             )}
             {executing ? '执行中...' : '执行任务'}
           </Button>
@@ -619,7 +637,7 @@ function IssueDetailSheet({
             <h4 className="text-sm font-medium mb-1">创建者</h4>
             <div className="flex items-center gap-2">
               <Avatar className="size-5">
-                <AvatarFallback className={`text-[8px] ${issue.creator?.type === 'agent' ? 'bg-primary/10 text-primary' : 'bg-blue-500/10 text-blue-600'}`}>
+                <AvatarFallback className={`text-[8px] ${issue.creator?.type === 'agent' ? 'bg-primary/10 text-primary' : 'bg-teal-500/10 text-teal-600'}`}>
                   {issue.creator?.type === 'agent' ? <Bot className="size-2.5" /> : issue.creator?.name?.charAt(0).toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
@@ -657,7 +675,7 @@ function IssueDetailSheet({
                   key={s}
                   variant="outline"
                   size="sm"
-                  className="text-xs gap-1 hover:-translate-y-0.5 transition-all"
+                  className="text-xs gap-1 hover:-translate-y-0.5 transition-all hover:border-primary/30 hover:bg-primary/5"
                   onClick={() => handleStatusChange(s)}
                   disabled={changeStatusMutation.isPending}
                 >
@@ -690,8 +708,8 @@ function IssueDetailSheet({
             <div className="space-y-3 max-h-64 overflow-y-auto mb-3">
               {comments.map((comment) => (
                 <div key={comment.id} className="flex gap-2.5">
-                  <Avatar className="size-6 mt-0.5">
-                    <AvatarFallback className={`text-[8px] ${comment.authorType === 'agent' ? 'bg-primary/10 text-primary' : comment.authorType === 'system' ? 'bg-amber-500/10 text-amber-600' : 'bg-blue-500/10 text-blue-600'}`}>
+                  <Avatar className="size-6 mt-0.5 ring-1 ring-border/30">
+                    <AvatarFallback className={`text-[8px] ${comment.authorType === 'agent' ? 'bg-primary/10 text-primary' : comment.authorType === 'system' ? 'bg-amber-500/10 text-amber-600' : 'bg-teal-500/10 text-teal-600'}`}>
                       {comment.authorType === 'agent' ? <Bot className="size-3" /> : comment.author?.name?.charAt(0).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
@@ -793,6 +811,7 @@ export function BoardView() {
   const userId = user?.id || null
   const { data: allIssues, isLoading: issuesLoading } = useIssues()
   const { data: agents } = useAgents()
+  const { boardViewMode, setBoardViewMode } = useAppStore()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
@@ -801,6 +820,11 @@ export function BoardView() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterAssignee, setFilterAssignee] = useState('all')
   const [filterPriority, setFilterPriority] = useState('all')
+
+  // Table view state
+  const [sortField, setSortField] = useState<'priority' | 'status' | 'createdAt' | 'title'>('createdAt')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const changeStatusMutation = useUpdateIssueStatus()
   const deleteIssueMutation = useDeleteIssue()
@@ -916,10 +940,34 @@ export function BoardView() {
           </h1>
           <p className="text-muted-foreground mt-1">看板视图 - 拖拽管理任务状态</p>
         </div>
-        <Button className="gap-2 hover:-translate-y-0.5 transition-all" onClick={() => setCreateDialogOpen(true)}>
-          <Plus className="size-4" />
-          新建 Issue
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* View Mode Toggle */}
+          <div className="flex items-center rounded-md border border-border/50 p-0.5">
+            <Button
+              variant={boardViewMode === 'kanban' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 px-2 gap-1.5 text-xs"
+              onClick={() => setBoardViewMode('kanban')}
+            >
+              <Kanban className="size-3.5" />
+              看板
+            </Button>
+            <Button
+              variant={boardViewMode === 'table' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 px-2 gap-1.5 text-xs"
+              onClick={() => setBoardViewMode('table')}
+            >
+              <List className="size-3.5" />
+              列表
+            </Button>
+          </div>
+
+          <Button className="gap-2 hover:-translate-y-0.5 transition-all shadow-sm hover:shadow-md" onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="size-4" />
+            新建 Issue
+          </Button>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -998,7 +1046,7 @@ export function BoardView() {
         </DropdownMenu>
       </div>
 
-      {/* Kanban Board */}
+      {/* Board Content */}
       {issuesLoading ? (
         <div className="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-4">
           {COLUMN_CONFIG.map((col) => (
@@ -1009,13 +1057,13 @@ export function BoardView() {
                 <Skeleton className="h-4 w-6 ml-auto" />
               </div>
               <div className="flex-1 p-2 space-y-2">
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full shimmer" />
+                <Skeleton className="h-24 w-full shimmer" />
               </div>
             </div>
           ))}
         </div>
-      ) : (
+      ) : boardViewMode === 'kanban' ? (
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
@@ -1043,6 +1091,213 @@ export function BoardView() {
             ) : null}
           </DragOverlay>
         </DndContext>
+      ) : (
+        /* Table View */
+        <div className="flex-1 overflow-auto rounded-lg border border-border/50">
+          {/* Bulk Actions Bar */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 px-4 py-2 bg-primary/5 border-b border-primary/10">
+              <span className="text-xs font-medium text-primary">
+                已选择 {selectedIds.size} 项
+              </span>
+              <div className="flex items-center gap-2">
+                <Select onValueChange={(val) => {
+                  selectedIds.forEach(id => {
+                    changeStatusMutation.mutate({ id, data: { status: val } })
+                  })
+                  setSelectedIds(new Set())
+                  toast.success(`已更新 ${selectedIds.size} 项状态`)
+                }}>
+                  <SelectTrigger className="h-7 w-28 text-xs">
+                    <SelectValue placeholder="批量改状态" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">待处理</SelectItem>
+                    <SelectItem value="in_progress">进行中</SelectItem>
+                    <SelectItem value="in_review">待审查</SelectItem>
+                    <SelectItem value="resolved">已解决</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => {
+                    selectedIds.forEach(id => deleteIssueMutation.mutate(id))
+                    setSelectedIds(new Set())
+                    toast.success(`已删除 ${selectedIds.size} 项`)
+                  }}
+                >
+                  <Trash2 className="size-3" />
+                  批量删除
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setSelectedIds(new Set())}
+                >
+                  取消选择
+                </Button>
+              </div>
+            </div>
+          )}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10">
+                  <UICheckbox
+                    checked={selectedIds.size > 0 && selectedIds.size === filteredIssues.length}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedIds(new Set(filteredIssues.map(i => i.id)))
+                      } else {
+                        setSelectedIds(new Set())
+                      }
+                    }}
+                  />
+                </TableHead>
+                <TableHead className="w-8" />
+                <TableHead
+                  className="cursor-pointer hover:text-foreground transition-colors"
+                  onClick={() => {
+                    if (sortField === 'title') setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+                    else { setSortField('title'); setSortDir('asc') }
+                  }}
+                >
+                  <span className="flex items-center gap-1">
+                    标题
+                    <ArrowUpDown className="size-3 opacity-50" />
+                  </span>
+                </TableHead>
+                <TableHead className="hidden md:table-cell">场景</TableHead>
+                <TableHead className="hidden sm:table-cell">指派</TableHead>
+                <TableHead
+                  className="cursor-pointer hover:text-foreground transition-colors"
+                  onClick={() => {
+                    if (sortField === 'status') setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+                    else { setSortField('status'); setSortDir('asc') }
+                  }}
+                >
+                  <span className="flex items-center gap-1">
+                    状态
+                    <ArrowUpDown className="size-3 opacity-50" />
+                  </span>
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:text-foreground transition-colors hidden lg:table-cell"
+                  onClick={() => {
+                    if (sortField === 'createdAt') setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+                    else { setSortField('createdAt'); setSortDir('desc') }
+                  }}
+                >
+                  <span className="flex items-center gap-1">
+                    创建时间
+                    <ArrowUpDown className="size-3 opacity-50" />
+                  </span>
+                </TableHead>
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredIssues.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                    暂无匹配的任务
+                  </TableCell>
+                </TableRow>
+              ) : (
+                [...filteredIssues].sort((a, b) => {
+                  const dir = sortDir === 'asc' ? 1 : -1
+                  if (sortField === 'title') return dir * a.title.localeCompare(b.title)
+                  if (sortField === 'status') return dir * a.status.localeCompare(b.status)
+                  if (sortField === 'priority') {
+                    const order = { urgent: 0, high: 1, medium: 2, low: 3 }
+                    return dir * ((order[a.priority as keyof typeof order] ?? 2) - (order[b.priority as keyof typeof order] ?? 2))
+                  }
+                  if (sortField === 'createdAt') return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                  return 0
+                }).map((issue) => {
+                  const priority = PRIORITY_CONFIG[issue.priority] || PRIORITY_CONFIG.medium
+                  const isSelected = selectedIds.has(issue.id)
+                  return (
+                    <TableRow
+                      key={issue.id}
+                      className={`cursor-pointer hover:bg-muted/50 transition-colors ${isSelected ? 'bg-primary/5' : ''}`}
+                      onClick={() => handleIssueClick(issue)}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <UICheckbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => {
+                            setSelectedIds(prev => {
+                              const next = new Set(prev)
+                              if (checked) next.add(issue.id)
+                              else next.delete(issue.id)
+                              return next
+                            })
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <span className={`size-2.5 rounded-full block ${priority.color.replace('text-', 'bg-').replace('600', '500')}`} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium line-clamp-1">{issue.title}</span>
+                          <div className="hidden sm:flex items-center gap-1">
+                            <Badge variant="outline" className={`text-[9px] px-1 py-0 ${priority.bg} ${priority.color} border`}>
+                              {priority.label}
+                            </Badge>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {issue.scene && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {SCENE_LABELS[issue.scene] || issue.scene}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        {issue.assignee ? (
+                          <div className="flex items-center gap-1.5">
+                            <Avatar className="size-5">
+                              <AvatarFallback className={`text-[8px] ${issue.assignee.type === 'agent' ? 'bg-primary/10 text-primary' : 'bg-teal-500/10 text-teal-600'}`}>
+                                {issue.assignee.type === 'agent' ? <Bot className="size-2.5" /> : issue.assignee.name.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-xs text-muted-foreground">{issue.assignee.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          {STATUS_LABELS[issue.status] || issue.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(issue.createdAt), { addSuffix: true, locale: zhCN })}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => deleteIssueMutation.mutate(issue.id)}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       {/* Create Issue Dialog */}
@@ -1061,7 +1316,8 @@ export function BoardView() {
           setDetailOpen(open)
           if (!open) setSelectedIssue(null)
         }}
-        agents={agents || []}
+        agents={agents || []
+        }
         userId={userId}
       />
     </div>
