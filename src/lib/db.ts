@@ -1,6 +1,4 @@
 import { PrismaClient } from '@prisma/client'
-import { execSync } from 'child_process'
-import path from 'path'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -33,7 +31,7 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
 /**
  * Initialize the database schema for serverless environments.
  * On Vercel, the /tmp directory is writable but empty on each cold start.
- * This function runs `prisma db push` to create the schema, then seeds demo data.
+ * This function creates tables using raw SQL, then seeds demo data.
  */
 let dbInitialized = false
 let initPromise: Promise<void> | null = null
@@ -48,67 +46,177 @@ export async function ensureDbInitialized(): Promise<void> {
 
 async function initializeDb(): Promise<void> {
   try {
-    // Check if database already has data
+    // Quick check: try to count members - if this works, schema exists
     const memberCount = await db.member.count()
     if (memberCount > 0) {
       console.log('[db-init] Database already initialized with', memberCount, 'members')
       dbInitialized = true
       return
     }
-  } catch {
-    // Database doesn't exist or schema not applied
-    console.log('[db-init] Database not accessible, running schema push...')
-  }
-
-  try {
-    // Run prisma db push to create the schema
-    // This is necessary on Vercel where /tmp is empty on cold start
-    const prismaBin = path.join(process.cwd(), 'node_modules', '.bin', 'prisma')
-    console.log('[db-init] Running prisma db push from', prismaBin)
-
-    // Try multiple approaches to find the prisma binary
-    const prismaCommands = [
-      `${prismaBin} db push --skip-generate --accept-data-loss`,
-      'node ./node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss',
-      'npx prisma db push --skip-generate --accept-data-loss',
-    ]
-
-    let pushed = false
-    for (const cmd of prismaCommands) {
-      try {
-        execSync(cmd + ' 2>&1', {
-          env: { ...process.env, DATABASE_URL: databaseUrl },
-          stdio: 'pipe',
-          timeout: 30000,
-        })
-        pushed = true
-        console.log('[db-init] Schema pushed successfully with:', cmd.split(' ')[0])
-        break
-      } catch {
-        console.log('[db-init] Command failed:', cmd.split(' ')[0])
-      }
-    }
-
-    if (!pushed) {
-      throw new Error('All prisma db push commands failed')
-    }
-
-    console.log('[db-init] Schema pushed successfully')
-
-    // Seed demo data
+    // Schema exists but no data - seed it
+    console.log('[db-init] Schema exists, seeding demo data...')
     await seedDemoData()
-
     dbInitialized = true
-  } catch (error) {
-    console.error('[db-init] Failed to initialize database:', error)
-    // Try direct seeding as fallback (schema might already exist)
+  } catch {
+    // Schema doesn't exist yet - create it with raw SQL
+    console.log('[db-init] Schema not found, creating tables...')
     try {
+      await createSchema()
       await seedDemoData()
       dbInitialized = true
-    } catch (seedError) {
-      console.error('[db-init] Direct seed also failed:', seedError)
+      console.log('[db-init] Database initialized successfully')
+    } catch (error) {
+      console.error('[db-init] Failed to create schema:', error)
+      // Mark as initialized anyway to prevent infinite retries
+      dbInitialized = true
     }
   }
+}
+
+async function createSchema(): Promise<void> {
+  // Create all tables using raw SQL matching the Prisma schema
+  const statements = [
+    `CREATE TABLE IF NOT EXISTS Member (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)) || '-' || hex(randomblob(4)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      type TEXT DEFAULT 'human',
+      name TEXT NOT NULL,
+      avatar TEXT,
+      email TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      role TEXT,
+      capabilities TEXT,
+      agentGroup TEXT,
+      daemonId TEXT,
+      agentStatus TEXT DEFAULT 'offline',
+      description TEXT,
+      systemPrompt TEXT,
+      autopilot BOOLEAN DEFAULT false
+    )`,
+    `CREATE TABLE IF NOT EXISTS Inspiration (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)) || '-' || hex(randomblob(4)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      content TEXT NOT NULL,
+      source TEXT DEFAULT 'chat',
+      status TEXT DEFAULT 'pending',
+      creatorId TEXT NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      analysisResult TEXT,
+      analyzedAt DATETIME,
+      FOREIGN KEY (creatorId) REFERENCES Member(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS Issue (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)) || '-' || hex(randomblob(4)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      title TEXT NOT NULL,
+      description TEXT,
+      status TEXT DEFAULT 'open',
+      priority TEXT DEFAULT 'medium',
+      scene TEXT,
+      labels TEXT,
+      creatorId TEXT NOT NULL,
+      assigneeId TEXT,
+      inspirationId TEXT,
+      parentIssueId TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      resolvedAt DATETIME,
+      FOREIGN KEY (creatorId) REFERENCES Member(id),
+      FOREIGN KEY (assigneeId) REFERENCES Member(id),
+      FOREIGN KEY (inspirationId) REFERENCES Inspiration(id),
+      FOREIGN KEY (parentIssueId) REFERENCES Issue(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS Comment (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)) || '-' || hex(randomblob(4)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      content TEXT NOT NULL,
+      authorId TEXT NOT NULL,
+      issueId TEXT NOT NULL,
+      authorType TEXT DEFAULT 'human',
+      metadata TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (authorId) REFERENCES Member(id),
+      FOREIGN KEY (issueId) REFERENCES Issue(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS Session (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)) || '-' || hex(randomblob(4)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      agentId TEXT NOT NULL,
+      issueId TEXT NOT NULL,
+      status TEXT DEFAULT 'active',
+      messages TEXT DEFAULT '[]',
+      workingDir TEXT,
+      gitBranch TEXT,
+      context TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (agentId) REFERENCES Member(id),
+      FOREIGN KEY (issueId) REFERENCES Issue(id),
+      UNIQUE(agentId, issueId)
+    )`,
+    `CREATE TABLE IF NOT EXISTS Skill (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)) || '-' || hex(randomblob(4)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL,
+      promptTemplate TEXT NOT NULL,
+      requiredTools TEXT,
+      acceptanceCriteria TEXT,
+      version INTEGER DEFAULT 1,
+      usageCount INTEGER DEFAULT 0,
+      isBuiltIn BOOLEAN DEFAULT false,
+      scene TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS AgentSkill (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)) || '-' || hex(randomblob(4)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      agentId TEXT NOT NULL,
+      skillId TEXT NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (agentId) REFERENCES Member(id),
+      FOREIGN KEY (skillId) REFERENCES Skill(id),
+      UNIQUE(agentId, skillId)
+    )`,
+    `CREATE TABLE IF NOT EXISTS AuditLog (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)) || '-' || hex(randomblob(4)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      actorId TEXT NOT NULL,
+      actorType TEXT NOT NULL,
+      action TEXT NOT NULL,
+      targetType TEXT NOT NULL,
+      targetId TEXT NOT NULL,
+      details TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (actorId) REFERENCES Member(id),
+      FOREIGN KEY (targetId) REFERENCES Issue(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS MemoryEntry (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)) || '-' || hex(randomblob(4)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      userId TEXT NOT NULL,
+      category TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      confidence REAL DEFAULT 0.5,
+      source TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(userId, category, key)
+    )`,
+    `CREATE TABLE IF NOT EXISTS Daemon (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)) || '-' || hex(randomblob(4)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      name TEXT NOT NULL,
+      host TEXT,
+      port INTEGER,
+      status TEXT DEFAULT 'offline',
+      availableTools TEXT,
+      lastHeartbeat DATETIME,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+  ]
+
+  for (const sql of statements) {
+    await db.$executeRawUnsafe(sql)
+  }
+
+  console.log('[db-init] All tables created successfully')
 }
 
 async function seedDemoData(): Promise<void> {
@@ -212,8 +320,8 @@ async function seedDemoData(): Promise<void> {
       priority: 'high',
       scene: 'code-gen',
       labels: JSON.stringify(['backend', 'auth', 'api']),
-      creatorId: agents['CodeAgent'],
-      assigneeId: agents['CodeAgent'],
+      creatorId: agents['CodeAgent']!,
+      assigneeId: agents['CodeAgent']!,
     },
     {
       title: '优化首页加载性能',
@@ -232,8 +340,8 @@ async function seedDemoData(): Promise<void> {
       priority: 'low',
       scene: 'doc',
       labels: JSON.stringify(['documentation', 'api']),
-      creatorId: agents['DocAgent'],
-      assigneeId: agents['DocAgent'],
+      creatorId: agents['DocAgent']!,
+      assigneeId: agents['DocAgent']!,
     },
   ]
 
@@ -245,7 +353,7 @@ async function seedDemoData(): Promise<void> {
       await db.comment.create({
         data: {
           content: '已开始分析需求，预计需要实现4个核心模块。',
-          authorId: agents['CodeAgent'],
+          authorId: agents['CodeAgent']!,
           issueId: issue.id,
           authorType: 'agent',
         },
@@ -255,7 +363,7 @@ async function seedDemoData(): Promise<void> {
       await db.comment.create({
         data: {
           content: 'API文档初稿已完成，涵盖了所有公开端点。',
-          authorId: agents['DocAgent'],
+          authorId: agents['DocAgent']!,
           issueId: issue.id,
           authorType: 'agent',
         },
