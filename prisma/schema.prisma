@@ -1,8 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// AgentTeam 协作平台 - 数据库Schema
+// 核心原则：Agent一等公民、上下文第一资产、Agent驱动任务创建
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +10,227 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+// ==========================================
+// 1. 统一成员模型（Agent一等公民）
+// ==========================================
+
+model Member {
   id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
+  type      String   @default("human") // "human" | "agent"
+  name      String
+  avatar    String?
+  email     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Human 专属字段
+  role      String?  // "admin" | "member"（仅人类）
+
+  // Agent 专属字段
+  capabilities String? // JSON数组字符串，如 ["code-gen","review","doc"]
+  agentGroup   String? // 所属群组
+  daemonId     String? // 绑定的Daemon ID
+  agentStatus  String? @default("offline") // "online" | "busy" | "offline"
+  description  String? // Agent描述
+  systemPrompt String? // Agent系统提示词
+
+  // 关系
+  createdIssues    Issue[]    @relation("IssueCreator")
+  assignedIssues   Issue[]    @relation("IssueAssignee")
+  comments         Comment[]
+  sessions         Session[]
+  inspirations     Inspiration[] @relation("InspirationCreator")
+  auditLogs        AuditLog[]
+
+  // Agent技能绑定
+  skills           AgentSkill[]
 }
 
-model Post {
+// ==========================================
+// 2. 灵感/想法（用户主要输入方式）
+// ==========================================
+
+model Inspiration {
+  id          String   @id @default(cuid())
+  content     String   // 用户的原始表达
+  source      String   @default("chat") // "chat" | "voice" | "quick_note" | "im"
+  status      String   @default("pending") // "pending" | "analyzing" | "converted" | "dismissed"
+  creatorId   String   // 人类用户ID
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Agent分析结果
+  analysisResult String? // JSON: Agent的分析结论
+  analyzedAt     DateTime?
+
+  // 关系
+  creator     Member    @relation("InspirationCreator", fields: [creatorId], references: [id])
+  issues      Issue[]   // Agent拆解后创建的Issue
+}
+
+// ==========================================
+// 3. Issue（Agent驱动的任务管理）
+// ==========================================
+
+model Issue {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  status      String   @default("open") // "open" | "triaged" | "in_progress" | "in_review" | "resolved" | "closed"
+  priority    String   @default("medium") // "low" | "medium" | "high" | "urgent"
+  scene       String?  // "code-gen" | "doc" | "analysis" | "review" | "custom"
+  labels      String?  // JSON数组字符串，Agent自动打标签
+
+  // 创建与指派（Agent为主要创建者）
+  creatorId   String   // 创建者（可以是Agent或人）
+  assigneeId  String?  // 指派人（默认Agent自己接手）
+
+  // 灵感来源
+  inspirationId String? // 来源灵感ID
+
+  // 父子关系（Agent拆解任务时产生）
+  parentIssueId String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  resolvedAt  DateTime?
+
+  // 关系
+  creator       Member       @relation("IssueCreator", fields: [creatorId], references: [id])
+  assignee      Member?      @relation("IssueAssignee", fields: [assigneeId], references: [id])
+  inspiration   Inspiration? @relation(fields: [inspirationId], references: [id])
+  parentIssue   Issue?       @relation("IssueChildren", fields: [parentIssueId], references: [id])
+  childIssues   Issue[]      @relation("IssueChildren")
+  comments      Comment[]
+  sessions      Session[]
+  auditLogs     AuditLog[]
+}
+
+// ==========================================
+// 4. 评论（人+Agent共用评论链）
+// ==========================================
+
+model Comment {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  content   String   // 评论内容（支持Markdown）
+  authorId  String   // 评论者ID（人或Agent）
+  issueId   String   // 所属Issue
+  authorType String  @default("human") // "human" | "agent" | "system"
+  metadata  String?  // JSON: 附加信息（代码差异、附件等）
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // 关系
+  author    Member   @relation(fields: [authorId], references: [id])
+  issue     Issue    @relation(fields: [issueId], references: [id])
+}
+
+// ==========================================
+// 5. 会话持久化（上下文是第一资产）
+// ==========================================
+
+model Session {
+  id          String   @id @default(cuid())
+  agentId     String   // Agent ID
+  issueId     String   // Issue ID
+  status      String   @default("active") // "active" | "paused" | "completed"
+  messages    String   @default("[]") // JSON数组：完整对话历史
+  workingDir  String?  // git工作目录路径
+  gitBranch   String?  // 当前分支
+  context     String?  // JSON: 额外上下文信息
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关系
+  agent       Member   @relation(fields: [agentId], references: [id])
+  issue       Issue    @relation(fields: [issueId], references: [id])
+
+  @@unique([agentId, issueId]) // 同一(Agent,Issue)唯一会话
+}
+
+// ==========================================
+// 6. Skill 系统（可复用技能）
+// ==========================================
+
+model Skill {
+  id                 String   @id @default(cuid())
+  name               String   @unique
+  description        String
+  promptTemplate     String   // Prompt模板
+  requiredTools      String?  // JSON数组：所需CLI工具
+  acceptanceCriteria String?  // 验收标准
+  version            Int      @default(1)
+  usageCount         Int      @default(0)
+  isBuiltIn          Boolean  @default(false) // 内置 vs 用户自定义
+  scene              String?  // 适用场景
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // 关系
+  agentSkills AgentSkill[]
+}
+
+model AgentSkill {
+  id        String   @id @default(cuid())
+  agentId   String   // Agent ID
+  skillId   String   // Skill ID
+  createdAt DateTime @default(now())
+
+  agent     Member   @relation(fields: [agentId], references: [id])
+  skill     Skill    @relation(fields: [skillId], references: [id])
+
+  @@unique([agentId, skillId])
+}
+
+// ==========================================
+// 7. 审计日志（所有操作可审计可回滚）
+// ==========================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String   // 操作者ID
+  actorType   String   // "human" | "agent" | "system"
+  action      String   // 操作类型：create_issue, change_status, auto_merge, etc.
+  targetType  String   // "issue" | "comment" | "session" | "pr" | ...
+  targetId    String   // 目标对象ID
+  details     String?  // JSON: 详细信息
+  createdAt   DateTime @default(now())
+
+  // 关系
+  actor       Member   @relation(fields: [actorId], references: [id])
+  issue       Issue?   @relation(fields: [targetId], references: [id])
+}
+
+// ==========================================
+// 8. 偏好记忆（简化版MemoryAgent）
+// ==========================================
+
+model MemoryEntry {
+  id          String   @id @default(cuid())
+  userId      String   // 目标用户ID
+  category    String   // "code_style" | "review_preference" | "priority" | "workflow" | ...
+  key         String   // 偏好键
+  value       String   // 偏好值（JSON）
+  confidence  Float    @default(0.5) // 置信度 0-1
+  source      String?  // 事件来源
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, category, key])
+}
+
+// ==========================================
+// 9. Daemon 注册
+// ==========================================
+
+model Daemon {
+  id            String   @id @default(cuid())
+  name          String
+  host          String?  // 主机地址
+  port          Int?     // 端口
+  status        String   @default("offline") // "online" | "offline"
+  availableTools String? // JSON数组：可用CLI工具
+  lastHeartbeat DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

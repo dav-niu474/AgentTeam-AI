@@ -26,14 +26,21 @@ Stage Summary:
 **AgentTeam** 是一个"把 AI Agent 当作团队成员"的协作平台。核心交互模式：
 
 ```
-人类用户 ←→ Issue Board（任务看板） ←→ AI Agent（自动执行）
-                ↕                           ↕
-           评论/审批/反馈              代码/文档/分析结果
-                ↕                           ↕
-           移动端(IM)                  本地 Daemon（终端执行）
+用户（灵感/需求/想法）→ Agent（分析/理解/拆解/创建Issue）→ Issue Board → Agent（自主执行）
+                              ↕                                    ↕
+                     结合历史经验/偏好                        评论/代码/文档/结果
+                              ↕                                    ↕
+                      MemoryAgent                              Daemon（终端）
 ```
 
-**本质**：它不是"给开发者用的AI助手"，而是一个**项目管理工具**，其中AI Agent和人类是完全平等的项目成员。
+**本质**：它不是"给开发者用的AI助手"，而是一个**Agent驱动的自主协作平台**。用户是"灵感提供者"和"方向决策者"，Agent是"理解者"、"执行者"和"问题发现者"。Agent不仅被动执行任务，更是主动创建任务、分析需求、拆解问题的核心驱动力。
+
+### 🔄 核心交互范式转变
+
+**传统模式**：用户创建Issue → 指派Agent → Agent执行
+**AgentTeam模式**：用户表达想法 → Agent分析理解 → Agent自主创建Issue → Agent自主执行 → Agent反馈结果
+
+用户可以直接创建Issue（保留此能力），但**主要流程是Agent驱动**。
 
 ## 二、系统架构（双体结构）
 
@@ -95,19 +102,35 @@ Member (抽象基类)
     └── status: "online" | "busy" | "offline"
 ```
 
-### 3.2 Issue 生命周期
+### 3.2 灵感与Issue（Agent驱动的任务创建）
 
+**Inspiration（灵感/想法）**— 用户的主要输入方式：
 ```
-Open → Triaged → In Progress → In Review → Resolved
-  ↓                                         ↓
-  └──────────→ Closed ←─────────────────────┘
+Inspiration
+├── content: string (用户的原始表达，自然语言)
+├── source: "chat" | "voice" | "quick_note" | "im"
+├── status: "pending" | "analyzing" | "converted" | "dismissed"
+├── createdBy: string (人类用户ID)
+└── convertedIssues: Issue[] (Agent拆解后创建的Issue列表)
+```
+
+**Issue 生命周期（Agent主导）**：
+```
+用户表达想法 → Agent分析 → Agent创建Issue(Open) → Agent自动指派自己 → In Progress → In Review → Resolved
+                  ↓                                                            ↓
+            Agent拆解为多个子Issue                                     人类审批/反馈
 ```
 
 每个Issue关联：
-- assignee: Member (人或Agent)
+- creator: Member (Agent或人，但主要是Agent创建)
+- assignee: Member (默认Agent自己接手)
+- inspirationId: string? (来源灵感，可选)
+- parentIssueId: string? (父Issue，Agent拆解时产生)
 - comments: Comment[] (人+Agent共用)
 - session: Session (Agent执行上下文)
 - scene: string (场景：code-gen, doc, analysis...)
+- priority: "low" | "medium" | "high" | "urgent" (Agent可根据偏好判断)
+- labels: string[] (Agent自动打标签)
 
 ### 3.3 会话持久化
 
@@ -254,18 +277,33 @@ MemoryEntry
 - 任务队列管理
 - 工作目录隔离
 
-### 6.3 Agent执行流程
+### 6.3 Agent执行流程（Agent驱动版）
 ```
-1. 用户创建Issue并指派给Agent
-2. Orchestrator创建Session
-3. Daemon接收任务，准备环境
-4. Agent读取Issue描述（通过SDK调用LLM）
-5. Agent生成代码/修改
-6. Agent运行linter/test
-7. Agent提交评论和结果
-8. 用户审查，可追加要求
-9. Agent在同一Session中增量修改
-10. 循环直到Issue标记Done
+1. 用户表达想法/灵感（聊天框/快速输入/IM）
+2. Agent接收灵感，调用LLM分析理解
+3. Agent结合历史偏好(MemoryAgent简化版)判断优先级
+4. Agent自主创建Issue(s)，可能拆解为多个子任务
+5. Agent自动指派给自己，状态变为In Progress
+6. Orchestrator创建Session
+7. Daemon接收任务，准备环境
+8. Agent读取Issue描述（通过SDK调用LLM）
+9. Agent生成代码/修改
+10. Agent运行linter/test
+11. Agent提交评论和结果，状态变为In Review
+12. 用户审查，可追加要求或批准
+13. Agent在同一Session中增量修改（若用户反馈）
+14. Issue标记Resolved，经验沉淀到偏好库
+```
+
+### 6.4 灵感输入 → Agent分析的API流程
+```
+POST /api/inspirations
+  → 保存灵感内容
+  → 触发Agent分析（异步）
+  → Agent调用LLM理解意图
+  → Agent结合偏好判断
+  → Agent创建Issue(s)
+  → 返回创建结果
 ```
 
 ## 七、开发优先级路线图
